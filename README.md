@@ -8,6 +8,6 @@ Repositorio oficial para el proyecto Capstone.
 - Fase 3
 
 ## Integrantes
-- Quintanilla
-- Flores
-- Montenegro
+- Benjamin Quintanilla
+- Alexis Flores
+- Cristopher Montenegro
