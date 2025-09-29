@@ -1,0 +1,20 @@
+package pos.ui.views;
+
+import javax.swing.*;
+import java.awt.*;
+
+public class VentasPanel extends JPanel {
+    public VentasPanel() {
+        setLayout(new BorderLayout());
+        setBackground(new Color(0xF9FAFB));
+
+        JLabel t = new JLabel("Ventas");
+        t.setFont(t.getFont().deriveFont(Font.BOLD, 18f));
+        t.setBorder(BorderFactory.createEmptyBorder(12,12,12,12));
+        add(t, BorderLayout.NORTH);
+
+        String[] cols = {"Código","Descripción","Cant.","P.Unit","Total"};
+        JTable table = new JTable(new javax.swing.table.DefaultTableModel(cols,0));
+        add(new JScrollPane(table), BorderLayout.CENTER);
+    }
+}

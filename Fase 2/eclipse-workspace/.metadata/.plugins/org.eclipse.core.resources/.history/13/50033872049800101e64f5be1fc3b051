@@ -1,0 +1,74 @@
+package pos.ui;
+
+import pos.ui.views.*;   // importa las vistas (DashboardPanel, VentasPanel, etc.)
+import javax.swing.*;
+import java.awt.*;
+
+public class MainFrame extends JFrame {
+    // Layout para cambiar de paneles
+    private final CardLayout card = new CardLayout();
+    private final JPanel content = new JPanel(card);
+    private final String roleGlobal;  // guardamos el rol del usuario
+
+    // Claves para identificar los paneles
+    public static final String DASHBOARD   = "dashboard";
+    public static final String VENTAS      = "ventas";
+    public static final String PRODUCTOS   = "productos";
+    public static final String CLIENTES    = "clientes";
+    public static final String INVENTARIO  = "inventario";
+    public static final String REPORTES    = "reportes";
+    public static final String USUARIOS    = "usuarios";
+    public static final String AJUSTES     = "ajustes";
+
+    // Constructor: recibe el usuario y el rol
+    public MainFrame(String username, String role) {
+        setTitle("Almacén Sonia — POS");
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setSize(1200, 720);
+        setLocationRelativeTo(null);
+        setLayout(new BorderLayout());
+
+        // Crear el menú lateral (se adapta según el rol)
+        Sidebar sidebar = new Sidebar(this::showView, role, username);
+        add(sidebar, BorderLayout.WEST);
+
+        // Vistas comunes
+        content.add(new DashboardPanel(), DASHBOARD);
+        content.add(new VentasPanel(), VENTAS);
+        content.add(new ProductosPanel(), PRODUCTOS);
+        content.add(new ClientesPanel(), CLIENTES);
+        content.add(new InventarioPanel(), INVENTARIO);
+        content.add(new ReportesPanel(), REPORTES);
+
+        // Vistas exclusivas de administrador
+        if ("ADMIN".equalsIgnoreCase(role)) {
+            content.add(new UsuariosPanel(), USUARIOS);
+            content.add(new AjustesPanel(), AJUSTES);
+        }
+
+        add(content, BorderLayout.CENTER);
+
+        // Pantalla inicial según el rol
+        if ("ADMIN".equalsIgnoreCase(role)) {
+            showView(DASHBOARD);
+        } else {
+            showView(VENTAS); // si es cajero va directo a ventas
+        }
+
+        this.roleGlobal = role;
+    }
+
+    // Método para cambiar de panel según la clave
+    public void showView(String key) {
+        // Evitamos que un Cajero entre a vistas de Admin
+        if (!"ADMIN".equalsIgnoreCase(roleGlobal) &&
+                (USUARIOS.equals(key) || AJUSTES.equals(key))) {
+            JOptionPane.showMessageDialog(this,
+                    "Permiso denegado (solo ADMIN).",
+                    "Acceso restringido",
+                    JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        card.show(content, key);
+    }
+}

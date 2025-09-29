@@ -1,0 +1,48 @@
+package pos.ui;
+
+import javax.swing.*;
+import java.awt.*;
+import java.util.function.Consumer;
+
+public class Sidebar extends JPanel {
+
+    public Sidebar(Consumer<String> onNavigate, String role, String username) {
+        // Tamaño y estilos
+        setPreferredSize(new Dimension(230, 720));
+        setLayout(new GridBagLayout());
+        setBackground(new Color(0x111827)); // gris muy oscuro
+
+        GridBagConstraints c = new GridBagConstraints();
+        c.gridx = 0;
+        c.fill = GridBagConstraints.HORIZONTAL;
+        c.insets = new Insets(6, 12, 6, 12);
+
+        // Título
+        JLabel title = new JLabel("Almacén Sonia");
+        title.setForeground(Color.WHITE);
+        title.setFont(title.getFont().deriveFont(Font.BOLD, 18f));
+        addAt(c, title);
+
+        // Botones principales
+        addBtn(c, "Dashboard", () -> onNavigate.accept(MainFrame.DASHBOARD));
+        addBtn(c, "Ventas", () -> onNavigate.accept(MainFrame.VENTAS));
+    }
+
+    // --- Helpers de UI ---
+    private void addBtn(GridBagConstraints c, String text, Runnable action) {
+        JButton b = new JButton(text);
+        b.setFocusPainted(false);
+        b.setBorderPainted(false);
+        b.setForeground(Color.WHITE);
+        b.setBackground(new Color(0x1F2937)); // gris
+        b.setPreferredSize(new Dimension(190, 40));
+        b.setFont(b.getFont().deriveFont(Font.PLAIN, 14f));
+        b.addActionListener(e -> action.run());
+        addAt(c, b);
+    }
+
+    private void addAt(GridBagConstraints c, JComponent comp) {
+        c.gridy++;
+        add(comp, c);
+    }
+}

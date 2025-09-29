@@ -1,0 +1,9 @@
+/**
+ * 
+ */
+/**
+ * 
+ */
+module POS_Sistema {
+    requires java.desktop;
+}

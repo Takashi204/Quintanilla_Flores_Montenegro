@@ -1,0 +1,79 @@
+package pos.store;
+
+import pos.model.Product;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+/**
+ * Fuente de datos EN MEMORIA para el front-end.
+ * No hay base de datos real: solo datos de ejemplo y operaciones CRUD básicas.
+ */
+public class nMemoryStore {
+
+    // “Base de datos” de productos
+    private static final List<Product> PRODUCTS = new ArrayList<>();
+
+    static {
+        // Datos semilla
+        PRODUCTS.add(new Product("1001", "Arroz 5kg", 24.90));
+        PRODUCTS.add(new Product("1002", "Azúcar 1kg", 4.20));
+        PRODUCTS.add(new Product("1003", "Aceite 1L", 8.50));
+        PRODUCTS.add(new Product("1004", "Leche 1L", 3.80));
+        PRODUCTS.add(new Product("1005", "Fideos 500g", 2.90));
+    }
+
+    /** Devuelve lista de solo lectura con todos los productos. */
+    public static List<Product> allProducts() {
+        return Collections.unmodifiableList(PRODUCTS);
+    }
+
+    /** Búsqueda por código o nombre (contiene, case-insensitive). */
+    public static List<Product> search(String query) {
+        if (query == null || query.isBlank()) return allProducts();
+        final String q = query.toLowerCase(Locale.ROOT);
+        return PRODUCTS.stream()
+                .filter(p -> p.getCode().toLowerCase(Locale.ROOT).contains(q)
+                          || p.getName().toLowerCase(Locale.ROOT).contains(q))
+                .collect(Collectors.toList());
+    }
+
+    /** Busca por código exacto (case-insensitive). */
+    public static Optional<Product> findByCode(String code) {
+        if (code == null) return Optional.empty();
+        return PRODUCTS.stream()
+                .filter(p -> p.getCode().equalsIgnoreCase(code))
+                .findFirst();
+    }
+
+    /** Inserta (si ya existe el código, lo reemplaza). */
+    public static void upsert(Product product) {
+        removeByCode(product.getCode());
+        PRODUCTS.add(product);
+    }
+
+    /** Elimina por código. */
+    public static boolean removeByCode(String code) {
+        return PRODUCTS.removeIf(p -> p.getCode().equalsIgnoreCase(code));
+    }
+
+    /** Actualiza un producto existente (por código). Devuelve true si lo encontró. */
+    public static boolean update(Product product) {
+        Optional<Product> opt = findByCode(product.getCode());
+        if (opt.isEmpty()) return false;
+        Product p = opt.get();
+        p.setName(product.getName());
+        p.setPrice(product.getPrice());
+        return true;
+    }
+
+    /** Genera un código nuevo simple (siguiente correlativo de 4 dígitos). */
+    public static String nextCode() {
+        int max = PRODUCTS.stream()
+                .map(Product::getCode)
+                .filter(c -> c.matches("\\d+"))
+                .mapToInt(Integer::parseInt)
+                .max().orElse(1000);
+        return String.valueOf(max + 1);
+    }
+}

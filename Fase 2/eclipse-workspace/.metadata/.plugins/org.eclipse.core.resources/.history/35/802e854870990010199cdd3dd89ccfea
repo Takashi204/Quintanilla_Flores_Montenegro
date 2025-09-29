@@ -1,0 +1,171 @@
+package pos.ui.views;
+
+import pos.model.Product;
+import pos.model.SaleItem;
+import pos.store.nMemoryStore;
+import pos.ui.table.LineItemTableModel;
+import pos.util.Money;
+import pos.util.Tax;
+
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.KeyEvent;
+import java.util.List;
+
+public class VentasPanel extends JPanel {
+
+    private final LineItemTableModel model = new LineItemTableModel();
+    private final JTable table = new JTable(model);
+
+    private final JLabel lblSub = new JLabel("S/ 0.00");
+    private final JLabel lblIgv = new JLabel("S/ 0.00");
+    private final JLabel lblTot = new JLabel("S/ 0.00");
+
+    public VentasPanel() {
+        setLayout(new BorderLayout(10,10));
+        setBackground(new Color(0xF9FAFB));
+
+        // ---------- Barra superior (acciones) ----------
+        JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8));
+        JButton bAdd = new JButton("F2 Agregar");
+        JButton bDel = new JButton("Supr Quitar");
+        JButton bClr = new JButton("Ctrl+N Nueva venta");
+        JButton bPay = new JButton("F4 Cobrar");
+
+        top.add(bAdd); top.add(bDel); top.add(bClr); top.add(bPay);
+        add(top, BorderLayout.NORTH);
+
+        // ---------- Tabla ----------
+        table.setRowHeight(24);
+        table.setFillsViewportHeight(true);
+        add(new JScrollPane(table), BorderLayout.CENTER);
+
+        // ---------- Totales ----------
+        JPanel totals = new JPanel(new GridLayout(3,2,8,6));
+        totals.setBorder(BorderFactory.createEmptyBorder(8, 12, 12, 12));
+        totals.add(new JLabel("Subtotal:")); totals.add(lblSub);
+        totals.add(new JLabel("IGV (18%):")); totals.add(lblIgv);
+        totals.add(new JLabel("TOTAL:")); totals.add(lblTot);
+        add(totals, BorderLayout.SOUTH);
+
+        // ---------- Acciones ----------
+        bAdd.addActionListener(e -> addProductFlow());
+        bDel.addActionListener(e -> removeSelected());
+        bClr.addActionListener(e -> { model.clear(); refreshTotals(); });
+        bPay.addActionListener(e -> checkoutFlow());
+
+        // Atajos
+        registerKeyboardAction(e -> addProductFlow(), KeyStroke.getKeyStroke(KeyEvent.VK_F2, 0),
+                JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT);
+        registerKeyboardAction(e -> removeSelected(), KeyStroke.getKeyStroke(KeyEvent.VK_DELETE, 0),
+                JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT);
+        registerKeyboardAction(e -> { model.clear(); refreshTotals(); }, KeyStroke.getKeyStroke(KeyEvent.VK_N, KeyEvent.CTRL_DOWN_MASK),
+                JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT);
+        registerKeyboardAction(e -> checkoutFlow(), KeyStroke.getKeyStroke(KeyEvent.VK_F4, 0),
+                JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT);
+
+        // Recalcular totales al editar tabla
+        table.getModel().addTableModelListener(e -> refreshTotals());
+
+        // Un item de ejemplo para no ver la tabla vacía
+        nMemoryStore.findByCode("1001").ifPresent(p -> {
+            model.addOrIncrement(new SaleItem(p, 1));
+            refreshTotals();
+        });
+    }
+
+    // ========== Flujos de UI ==========
+
+    private void addProductFlow() {
+        // 1) Pregunta por código rápido
+        String code = JOptionPane.showInputDialog(this, "Ingrese código de producto (o deje vacío para ver lista):",
+                "Agregar producto", JOptionPane.QUESTION_MESSAGE);
+
+        Product selected = null;
+
+        if (code != null && !code.isBlank()) {
+            selected = nMemoryStore.findByCode(code.trim()).orElse(null);
+            if (selected == null) {
+                JOptionPane.showMessageDialog(this, "No se encontró el código: " + code,
+                        "Producto no encontrado", JOptionPane.WARNING_MESSAGE);
+            }
+        }
+
+        // 2) Si no hay código válido, muestra selector simple por lista
+        if (selected == null) {
+            List<Product> all = InMemoryStore.allProducts();
+            if (all.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "No hay productos en la tienda.");
+                return;
+            }
+            selected = (Product) JOptionPane.showInputDialog(
+                    this,
+                    "Seleccione un producto:",
+                    "Listado de productos",
+                    JOptionPane.PLAIN_MESSAGE,
+                    null,
+                    all.toArray(),
+                    all.get(0)
+            );
+        }
+
+        if (selected != null) {
+            model.addOrIncrement(new SaleItem(selected, 1));
+            refreshTotals();
+        }
+    }
+
+    private void removeSelected() {
+        int r = table.getSelectedRow();
+        if (r >= 0) {
+            model.remove(r);
+            refreshTotals();
+        }
+    }
+
+    private void checkoutFlow() {
+        double subtotal = model.subtotal();
+        if (subtotal <= 0) {
+            JOptionPane.showMessageDialog(this, "No hay ítems en la venta.");
+            return;
+        }
+        double igv = Tax.calculate(subtotal);
+        double total = subtotal + igv;
+
+        String pagoStr = JOptionPane.showInputDialog(this,
+                "Total a cobrar: " + Money.format(total) + "\n\nIngrese monto recibido:",
+                "Cobrar", JOptionPane.QUESTION_MESSAGE);
+
+        if (pagoStr == null) return; // cancelado
+        try {
+            pagoStr = pagoStr.replaceAll("[^0-9.,]", "").replace(",", ".");
+            double recibido = Double.parseDouble(pagoStr);
+            if (recibido < total) {
+                JOptionPane.showMessageDialog(this, "Monto insuficiente.");
+                return;
+            }
+            double cambio = recibido - total;
+            JOptionPane.showMessageDialog(this,
+                    "Pago registrado.\nTotal: " + Money.format(total) +
+                            "\nRecibido: " + Money.format(recibido) +
+                            "\nVuelto: " + Money.format(cambio),
+                    "Venta completada", JOptionPane.INFORMATION_MESSAGE);
+
+            model.clear();
+            refreshTotals();
+
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Monto inválido.");
+        }
+    }
+
+    private void refreshTotals() {
+        double sub = model.subtotal();
+        double igv = Tax.calculate(sub);
+        double tot = sub + igv;
+
+        lblSub.setText(Money.format(sub));
+        lblIgv.setText(Money.format(igv));
+        lblTot.setText(Money.format(tot));
+    }
+}

@@ -1,0 +1,41 @@
+package pos.ui.views;
+
+import javax.swing.*;
+import java.awt.*;
+
+public class DashboardPanel extends JPanel {
+    public DashboardPanel() {
+        setLayout(new BorderLayout());
+        setBackground(new Color(0xF9FAFB));
+
+        JLabel t = new JLabel("Dashboard — Resumen");
+        t.setFont(t.getFont().deriveFont(Font.BOLD,20f));
+        t.setBorder(BorderFactory.createEmptyBorder(16,16,16,16));
+        add(t, BorderLayout.NORTH);
+    }
+}
+Clic derecho en pos.ui.views → New > Class → Nombre: VentasPanel → Finish.
+Pega este código:
+
+java
+Copiar código
+package pos.ui.views;
+
+import javax.swing.*;
+import java.awt.*;
+
+public class VentasPanel extends JPanel {
+    public VentasPanel() {
+        setLayout(new BorderLayout());
+        setBackground(new Color(0xF9FAFB));
+
+        JLabel t = new JLabel("Ventas");
+        t.setFont(t.getFont().deriveFont(Font.BOLD,18f));
+        t.setBorder(BorderFactory.createEmptyBorder(12,12,12,12));
+        add(t, BorderLayout.NORTH);
+
+        String[] cols = {"Código","Descripción","Cant.","P.Unit","Total"};
+        JTable table = new JTable(new javax.swing.table.DefaultTableModel(cols,0));
+        add(new JScrollPane(table), BorderLayout.CENTER);
+    }
+}

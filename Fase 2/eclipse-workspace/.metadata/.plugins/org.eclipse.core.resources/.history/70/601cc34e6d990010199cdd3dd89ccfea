@@ -1,0 +1,5 @@
+package pos.store;
+
+public class nMemoryStore {
+
+}

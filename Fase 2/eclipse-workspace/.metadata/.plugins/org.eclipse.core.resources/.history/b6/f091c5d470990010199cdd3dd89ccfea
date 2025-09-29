@@ -1,0 +1,27 @@
+package pos.util;
+
+import java.text.NumberFormat;
+import java.util.Locale;
+
+/**
+ * Utilidad para formatear valores monetarios.
+ */
+public class Money {
+
+    private static final NumberFormat FORMAT =
+            NumberFormat.getCurrencyInstance(new Locale("es", "PE")); // Perú (S/.)
+
+    /** Formatea un valor double a cadena con símbolo de moneda. */
+    public static String format(double amount) {
+        return FORMAT.format(amount);
+    }
+
+    /** Convierte cadena a número (si es posible). */
+    public static double parse(String text) {
+        try {
+            return FORMAT.parse(text).doubleValue();
+        } catch (Exception e) {
+            return 0.0;
+        }
+    }
+}

@@ -1,0 +1,42 @@
+package pos.ui;
+
+import pos.ui.views.*;   // importa las vistas que vas a crear (DashboardPanel, VentasPanel, etc.)
+import javax.swing.*;
+import java.awt.*;
+
+public class MainFrame extends JFrame {
+    // Layout para cambiar de paneles
+    private final CardLayout card = new CardLayout();
+    private final JPanel content = new JPanel(card);
+
+    // Claves para identificar los paneles
+    public static final String DASHBOARD = "dashboard";
+    public static final String VENTAS = "ventas";
+
+    // Constructor: recibe el usuario y el rol
+    public MainFrame(String username, String role) {
+        setTitle("Almacén Sonia — POS");
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setSize(1200, 720);
+        setLocationRelativeTo(null);
+        setLayout(new BorderLayout());
+
+        // Crear el menú lateral
+        Sidebar sidebar = new Sidebar(this::showView, role, username);
+        add(sidebar, BorderLayout.WEST);
+
+        // Agregar paneles al centro (vistas)
+        content.add(new DashboardPanel(), DASHBOARD);
+        content.add(new VentasPanel(), VENTAS);
+
+        add(content, BorderLayout.CENTER);
+
+        // Mostrar primero el dashboard
+        showView(DASHBOARD);
+    }
+
+    // Método para cambiar de panel según la clave
+    public void showView(String key) {
+        card.show(content, key);
+    }
+}

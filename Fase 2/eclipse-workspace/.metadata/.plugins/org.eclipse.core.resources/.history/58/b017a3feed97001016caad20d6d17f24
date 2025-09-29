@@ -1,0 +1,177 @@
+package pos.login;
+
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+
+public class LoginFrame extends JFrame {
+
+    private JTextField txtUser;
+    private JPasswordField txtPass;
+    private JRadioButton rAdmin, rCashier;
+
+    public LoginFrame() {
+        setTitle("Almacén Sonia — Login");
+        setSize(820, 520);
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+        setLayout(new BorderLayout());
+
+        // Fondo principal (gris claro)
+        JPanel bg = new JPanel(new GridBagLayout());
+        bg.setBackground(new Color(0xF5F7FA));
+        add(bg, BorderLayout.CENTER);
+
+        // Panel blanco para el login (card)
+        JPanel card = new JPanel(null);
+        card.setPreferredSize(new Dimension(380, 320));
+        card.setBackground(Color.WHITE);
+        // Borde y padding sutil para look más "pro"
+        card.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(0xE5E7EB), 1, true),
+                BorderFactory.createEmptyBorder(8, 8, 8, 8)
+        ));
+
+        JLabel lblTitle = new JLabel("Iniciar sesión", SwingConstants.CENTER);
+        lblTitle.setFont(new Font("SansSerif", Font.BOLD, 22));
+        lblTitle.setForeground(new Color(0x111827));
+        lblTitle.setBounds(100, 18, 180, 30);
+        card.add(lblTitle);
+
+        JLabel lblUser = new JLabel("Usuario");
+        lblUser.setForeground(new Color(0x374151));
+        lblUser.setBounds(40, 64, 300, 18);
+        card.add(lblUser);
+
+        txtUser = new JTextField();
+        txtUser.setBounds(40, 84, 300, 30);
+        styleField(txtUser);
+        card.add(txtUser);
+
+        JLabel lblPass = new JLabel("Contraseña");
+        lblPass.setForeground(new Color(0x374151));
+        lblPass.setBounds(40, 122, 300, 18);
+        card.add(lblPass);
+
+        txtPass = new JPasswordField();
+        txtPass.setBounds(40, 142, 300, 30);
+        styleField(txtPass);
+        card.add(txtPass);
+
+        // Mostrar/Ocultar contraseña
+        JCheckBox show = new JCheckBox("Mostrar contraseña");
+        show.setOpaque(false);
+        show.setForeground(new Color(0x6B7280));
+        show.setBounds(40, 176, 180, 22);
+        show.addActionListener(e -> txtPass.setEchoChar(show.isSelected() ? 0 : '\u2022'));
+        // valor inicial para ocultar
+        txtPass.setEchoChar('\u2022');
+        card.add(show);
+
+        // Radio buttons (rol)
+        rAdmin   = new JRadioButton("Administrador");
+        rCashier = new JRadioButton("Cajero");
+        rAdmin.setOpaque(false);
+        rCashier.setOpaque(false);
+        rAdmin.setForeground(new Color(0x333333));
+        rCashier.setForeground(new Color(0x333333));
+        rAdmin.setBounds(60, 202, 130, 24);
+        rCashier.setBounds(210, 202, 100, 24);
+
+        ButtonGroup group = new ButtonGroup();
+        group.add(rAdmin);
+        group.add(rCashier);
+        rAdmin.setSelected(true);
+
+        card.add(rAdmin);
+        card.add(rCashier);
+
+        JButton btnLogin = new JButton("Ingresar");
+        btnLogin.setBackground(new Color(0x2563EB)); // azul profesional
+        btnLogin.setForeground(Color.WHITE);
+        btnLogin.setFocusPainted(false);
+        btnLogin.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btnLogin.setBounds(120, 238, 140, 38);
+        // Hover/pressed ligero
+        btnLogin.addMouseListener(new MouseAdapter() {
+            @Override public void mouseEntered(MouseEvent e){ btnLogin.setBackground(new Color(0x1D4ED8)); }
+            @Override public void mouseExited (MouseEvent e){ btnLogin.setBackground(new Color(0x2563EB)); }
+            @Override public void mousePressed(MouseEvent e){ btnLogin.setBackground(new Color(0x1E40AF)); }
+            @Override public void mouseReleased(MouseEvent e){ btnLogin.setBackground(new Color(0x1D4ED8)); }
+        });
+        card.add(btnLogin);
+
+        // Columna izquierda (branding)
+        JPanel left = new JPanel();
+        left.setOpaque(false);
+        left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS));
+
+        JLabel t1 = new JLabel("Almacén Sonia");
+        t1.setFont(new Font("SansSerif", Font.BOLD, 28));
+        t1.setForeground(new Color(0x111827));
+
+        JLabel t2 = new JLabel("Sistema de ventas rápido y sencillo");
+        t2.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        t2.setForeground(new Color(0x374151));
+
+        left.add(t1);
+        left.add(Box.createVerticalStrut(8));
+        left.add(t2);
+
+        // Añadir al fondo
+        GridBagConstraints gc = new GridBagConstraints();
+        gc.insets = new Insets(20, 40, 20, 40);
+        gc.gridx = 0; gc.gridy = 0;
+        bg.add(left, gc);
+
+        gc.gridx = 1;
+        bg.add(card, gc);
+
+        // Acción de login
+        getRootPane().setDefaultButton(btnLogin);
+        btnLogin.addActionListener(e -> doLogin());
+    }
+
+    private void doLogin() {
+        String user = txtUser.getText().trim();
+        String pass = new String(txtPass.getPassword());
+        if (user.isEmpty() || pass.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Debe ingresar usuario y contraseña.", "Campos vacíos", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        String role = rAdmin.isSelected() ? "Administrador" : "Cajero";
+        JOptionPane.showMessageDialog(this, "Bienvenido " + user + " (" + role + ")");
+        // Aquí, cuando quieras, puedes abrir la ventana principal y cerrar el login.
+    }
+
+    // ---------- helpers de estilo ----------
+    private void styleField(JTextField field) {
+        field.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(0xD1D5DB), 1, true),
+                BorderFactory.createEmptyBorder(6, 10, 6, 10)
+        ));
+        field.setFont(new Font("SansSerif", Font.PLAIN, 14));
+        // Borde de focus en azul
+        field.addFocusListener(new FocusAdapter() {
+            @Override public void focusGained(FocusEvent e) {
+                field.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(new Color(0x2563EB), 2, true),
+                        BorderFactory.createEmptyBorder(5, 9, 5, 9)
+                ));
+            }
+            @Override public void focusLost(FocusEvent e) {
+                field.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(new Color(0xD1D5DB), 1, true),
+                        BorderFactory.createEmptyBorder(6, 10, 6, 10)
+                ));
+            }
+        });
+    }
+
+    public static void main(String[] args) {
+        // Look & Feel del sistema (opcional)
+        try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); } catch (Exception ignore) {}
+        SwingUtilities.invokeLater(() -> new LoginFrame().setVisible(true));
+    }
+}
+
