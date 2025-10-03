@@ -2,6 +2,7 @@ package pos.store;
 
 import pos.model.Product;
 
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -9,18 +10,17 @@ import java.util.stream.Collectors;
  * Fuente de datos EN MEMORIA para el front-end.
  * No hay base de datos real: solo datos de ejemplo y operaciones CRUD básicas.
  */
-public class nMemoryStore {
+public class InMemoryStore {
 
     // “Base de datos” de productos
     private static final List<Product> PRODUCTS = new ArrayList<>();
 
     static {
-        // Datos semilla
-        PRODUCTS.add(new Product("1001", "Arroz 5kg", 24.90));
-        PRODUCTS.add(new Product("1002", "Azúcar 1kg", 4.20));
-        PRODUCTS.add(new Product("1003", "Aceite 1L", 8.50));
-        PRODUCTS.add(new Product("1004", "Leche 1L", 3.80));
-        PRODUCTS.add(new Product("1005", "Fideos 500g", 2.90));
+        PRODUCTS.add(new Product("1001", "Arroz 5kg", "Alimentos", 2490, 50, null));
+        PRODUCTS.add(new Product("1002", "Azúcar 1kg", "Alimentos", 420, 100, null));
+        PRODUCTS.add(new Product("1003", "Aceite 1L", "Alimentos", 850, 30, null));
+        PRODUCTS.add(new Product("1004", "Leche 1L", "Lácteos", 380, 80, LocalDate.now().plusMonths(2)));
+        PRODUCTS.add(new Product("1005", "Fideos 500g", "Alimentos", 290, 60, null));
     }
 
     /** Devuelve lista de solo lectura con todos los productos. */
@@ -63,7 +63,10 @@ public class nMemoryStore {
         if (opt.isEmpty()) return false;
         Product p = opt.get();
         p.setName(product.getName());
+        p.setCategory(product.getCategory());
         p.setPrice(product.getPrice());
+        p.setStock(product.getStock());
+        p.setExpiry(product.getExpiry());
         return true;
     }
 
@@ -75,5 +78,20 @@ public class nMemoryStore {
                 .mapToInt(Integer::parseInt)
                 .max().orElse(1000);
         return String.valueOf(max + 1);
+    }
+
+    /** Productos con stock bajo. */
+    public static List<Product> lowStock(int threshold) {
+        return PRODUCTS.stream()
+                .filter(p -> p.getStock() <= threshold)
+                .collect(Collectors.toList());
+    }
+
+    /** Productos próximos a vencer. */
+    public static List<Product> expiringInDays(int days) {
+        LocalDate limit = LocalDate.now().plusDays(days);
+        return PRODUCTS.stream()
+                .filter(p -> p.getExpiry() != null && !p.getExpiry().isAfter(limit))
+                .collect(Collectors.toList());
     }
 }

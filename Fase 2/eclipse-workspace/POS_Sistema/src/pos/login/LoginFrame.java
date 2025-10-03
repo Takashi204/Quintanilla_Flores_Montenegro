@@ -263,4 +263,4 @@ public class LoginFrame extends JFrame {
         SwingUtilities.invokeLater(() -> new LoginFrame().setVisible(true));
     }
 }
-//cambio de prueba para credenciales GitHub
+

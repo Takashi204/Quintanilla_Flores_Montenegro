@@ -26,8 +26,7 @@ public class SaleItem {
         this.quantity = quantity;
     }
 
-    // --- Calcular total por item ---
-    public double getTotal() {
+    public int getTotal() {
         return product.getPrice() * quantity;
     }
 
