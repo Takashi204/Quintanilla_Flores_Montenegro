@@ -1,6 +1,7 @@
 package pos.store;
 
 import pos.model.Product;
+import pos.model.Client;  // <-- NUEVO
 
 import java.time.LocalDate;
 import java.util.*;
@@ -12,10 +13,11 @@ import java.util.stream.Collectors;
  */
 public class InMemoryStore {
 
-    // “Base de datos” de productos
+    // ===================== PRODUCTOS =====================
     private static final List<Product> PRODUCTS = new ArrayList<>();
 
     static {
+        // Semillas de productos
         PRODUCTS.add(new Product("1001", "Arroz 5kg", "Alimentos", 2490, 50, null));
         PRODUCTS.add(new Product("1002", "Azúcar 1kg", "Alimentos", 420, 100, null));
         PRODUCTS.add(new Product("1003", "Aceite 1L", "Alimentos", 850, 30, null));
@@ -87,11 +89,95 @@ public class InMemoryStore {
                 .collect(Collectors.toList());
     }
 
-    /** Productos próximos a vencer. */
+    /** Productos próximos a vencer (incluye ya vencidos hasta el límite). */
     public static List<Product> expiringInDays(int days) {
         LocalDate limit = LocalDate.now().plusDays(days);
         return PRODUCTS.stream()
                 .filter(p -> p.getExpiry() != null && !p.getExpiry().isAfter(limit))
                 .collect(Collectors.toList());
     }
+
+    // ========= ADAPTADORES PRODUCTOS (compatibilidad UI) =========
+    public static List<Product> getAllProducts() { return allProducts(); }
+    public static void addProduct(Product product) { upsert(product); }
+    public static void updateProduct(Product product) { if (!update(product)) upsert(product); }
+    public static boolean removeProduct(String code) { return removeByCode(code); }
+
+
+    // ===================== CLIENTES (NUEVO) =====================
+    private static final List<Client> CLIENTS = new ArrayList<>();
+
+    static {
+        // Semillas de clientes
+        CLIENTS.add(new Client("C0001","Juan Pérez","+56 9 1234 5678","juan@example.com","Santiago",    LocalDate.now().minusMonths(2)));
+        CLIENTS.add(new Client("C0002","María López","+56 9 9876 5432","maria@example.com","Providencia",LocalDate.now().minusWeeks(3)));
+        CLIENTS.add(new Client("C0003","Carlos Díaz","+56 2 2222 2222","carlos@example.com","Ñuñoa",     LocalDate.now().minusDays(10)));
+    }
+
+    /** Lista inmutable de clientes. */
+    public static List<Client> allClients() {
+        return Collections.unmodifiableList(CLIENTS);
+    }
+
+    /** Adaptador usado por la UI. */
+    public static List<Client> getAllClients() { return allClients(); }
+
+    /** Buscar por id, nombre, teléfono o email (contains, case-insensitive). */
+    public static List<Client> searchClients(String q) {
+        if (q == null || q.isBlank()) return allClients();
+        String s = q.toLowerCase(Locale.ROOT);
+        return CLIENTS.stream().filter(c ->
+                c.getId().toLowerCase(Locale.ROOT).contains(s) ||
+                c.getName().toLowerCase(Locale.ROOT).contains(s) ||
+                (c.getPhone()!=null && c.getPhone().toLowerCase(Locale.ROOT).contains(s)) ||
+                (c.getEmail()!=null && c.getEmail().toLowerCase(Locale.ROOT).contains(s))
+        ).collect(Collectors.toList());
+    }
+
+    /** Buscar cliente por ID exacto. */
+    public static Optional<Client> findClientById(String id) {
+        if (id == null) return Optional.empty();
+        return CLIENTS.stream().filter(c -> c.getId().equalsIgnoreCase(id)).findFirst();
+    }
+
+    /** Insertar/actualizar (por id). */
+    public static void upsertClient(Client c) {
+        removeClient(c.getId());
+        CLIENTS.add(c);
+    }
+
+    /** Actualizar campos (si no existe, false). */
+    public static boolean updateClient(Client c) {
+        Optional<Client> op = findClientById(c.getId());
+        if (op.isEmpty()) return false;
+        Client x = op.get();
+        x.setName(c.getName());
+        x.setPhone(c.getPhone());
+        x.setEmail(c.getEmail());
+        x.setAddress(c.getAddress());
+        x.setCreatedAt(c.getCreatedAt());
+        return true;
+    }
+
+    /** Adaptadores para la UI. */
+    public static void addClient(Client c) { upsertClient(c); }
+    public static void saveClient(Client c) { if (!updateClient(c)) upsertClient(c); }
+
+    /** Eliminar por id. */
+    public static boolean removeClient(String id) {
+        return CLIENTS.removeIf(cl -> cl.getId().equalsIgnoreCase(id));
+    }
+
+    /** Siguiente correlativo C0001, C0002, ... */
+    public static String nextClientId() {
+        int max = CLIENTS.stream()
+                .map(Client::getId)
+                .filter(s -> s.matches("C\\d+"))
+                .map(s -> s.substring(1))
+                .mapToInt(Integer::parseInt)
+                .max().orElse(0);
+        return String.format("C%04d", max + 1);
+    }
 }
+
+
