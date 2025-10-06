@@ -1,7 +1,8 @@
 package pos.store;
 
 import pos.model.Product;
-import pos.model.Client;  // <-- NUEVO
+import pos.model.Client;
+import pos.model.User;   // <-- NUEVO
 
 import java.time.LocalDate;
 import java.util.*;
@@ -104,7 +105,7 @@ public class InMemoryStore {
     public static boolean removeProduct(String code) { return removeByCode(code); }
 
 
-    // ===================== CLIENTES (NUEVO) =====================
+    // ===================== CLIENTES =====================
     private static final List<Client> CLIENTS = new ArrayList<>();
 
     static {
@@ -177,6 +178,76 @@ public class InMemoryStore {
                 .mapToInt(Integer::parseInt)
                 .max().orElse(0);
         return String.format("C%04d", max + 1);
+    }
+
+
+    // ===================== USUARIOS (NUEVO) =====================
+    private static final List<User> USERS = new ArrayList<>();
+
+    static {
+        // Semillas de usuarios
+        USERS.add(new User("U0001","admin","ADMIN", true, LocalDate.now().minusMonths(3), "admin123"));
+        USERS.add(new User("U0002","cajero","CAJERO", true, LocalDate.now().minusWeeks(2), "cajero123"));
+    }
+
+    public static List<User> allUsers() {
+        return Collections.unmodifiableList(USERS);
+    }
+    public static List<User> getAllUsers() { return allUsers(); }
+
+    public static List<User> searchUsers(String q) {
+        if (q == null || q.isBlank()) return allUsers();
+        String s = q.toLowerCase(Locale.ROOT);
+        return USERS.stream().filter(u ->
+                u.getId().toLowerCase(Locale.ROOT).contains(s) ||
+                u.getUsername().toLowerCase(Locale.ROOT).contains(s) ||
+                u.getRole().toLowerCase(Locale.ROOT).contains(s)
+        ).collect(Collectors.toList());
+    }
+
+    public static Optional<User> findUserById(String id) {
+        if (id == null) return Optional.empty();
+        return USERS.stream().filter(u -> u.getId().equalsIgnoreCase(id)).findFirst();
+    }
+
+    public static void upsertUser(User u) {
+        removeUser(u.getId());
+        USERS.add(u);
+    }
+    public static void addUser(User u) { upsertUser(u); }
+
+    public static boolean updateUser(User u) {
+        Optional<User> op = findUserById(u.getId());
+        if (op.isEmpty()) return false;
+        User x = op.get();
+        x.setUsername(u.getUsername());
+        x.setRole(u.getRole());
+        x.setActive(u.isActive());
+        x.setCreatedAt(u.getCreatedAt());
+        if (u.getPassword()!=null && !u.getPassword().isBlank()) x.setPassword(u.getPassword());
+        return true;
+    }
+    public static void saveUser(User u) { if (!updateUser(u)) upsertUser(u); }
+
+    public static boolean removeUser(String id) {
+        return USERS.removeIf(x -> x.getId().equalsIgnoreCase(id));
+    }
+
+    public static String nextUserId() {
+        int max = USERS.stream()
+                .map(User::getId)
+                .filter(s -> s.matches("U\\d+"))
+                .map(s -> s.substring(1))
+                .mapToInt(Integer::parseInt)
+                .max().orElse(0);
+        return String.format("U%04d", max + 1);
+    }
+
+    public static boolean resetUserPassword(String id, String newPass) {
+        Optional<User> op = findUserById(id);
+        if (op.isEmpty()) return false;
+        op.get().setPassword(newPass);
+        return true;
     }
 }
 
