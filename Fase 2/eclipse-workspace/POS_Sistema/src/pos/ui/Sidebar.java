@@ -23,10 +23,10 @@ public class Sidebar extends JPanel {
         title.setFont(title.getFont().deriveFont(Font.BOLD, 18f));
         addAt(c, title);
 
-        // --- Botones comunes ---
+        // --- Botones comunes (SIN Productos) ---
         addBtn(c, "Dashboard",  () -> onNavigate.accept(MainFrame.DASHBOARD));
         addBtn(c, "Ventas",     () -> onNavigate.accept(MainFrame.VENTAS));
-        addBtn(c, "Productos",  () -> onNavigate.accept(MainFrame.PRODUCTOS));
+        // (Eliminado) addBtn(c, "Productos",  () -> onNavigate.accept(MainFrame.PRODUCTOS));
         addBtn(c, "Clientes",   () -> onNavigate.accept(MainFrame.CLIENTES));
         addBtn(c, "Inventario", () -> onNavigate.accept(MainFrame.INVENTARIO));
         addBtn(c, "Reportes",   () -> onNavigate.accept(MainFrame.REPORTES));
@@ -69,7 +69,6 @@ public class Sidebar extends JPanel {
         addAt(c, sep);
     }
 
-    // 🔧 acepta Component (no solo JComponent) para usar Box.createVerticalGlue()
     private void addAt(GridBagConstraints c, Component comp) {
         c.gridy++;
         add(comp, c);

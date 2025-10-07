@@ -39,7 +39,6 @@ public class MainFrame extends JFrame {
 
             content.add(new DashboardPanel(), DASHBOARD);
             content.add(new CajeroPanel(), VENTAS);        
-            content.add(new ProductosPanel(), PRODUCTOS);
             content.add(new ClientesPanel(), CLIENTES);
             content.add(new InventarioPanel(), INVENTARIO);
 
