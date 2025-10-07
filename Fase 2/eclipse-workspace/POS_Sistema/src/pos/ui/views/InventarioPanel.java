@@ -14,6 +14,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+// === NUEVO: imports para BD ===
+import pos.db.ProductDao;
+import java.sql.SQLException;
+
 public class InventarioPanel extends JPanel {
 
     private static final DateTimeFormatter DF = DateTimeFormatter.ofPattern("dd-MM-yyyy");
@@ -24,11 +28,14 @@ public class InventarioPanel extends JPanel {
     private final JButton btnEntrada   = new JButton("Entrada (+)");
     private final JButton btnSalida    = new JButton("Salida (−)");
     private final JButton btnAjuste    = new JButton("Ajuste");
-    private final JButton btnHistorial = new JButton("Historial"); // ← NUEVO
+    private final JButton btnHistorial = new JButton("Historial"); // ← ya lo tenías
 
     // Tabla
     private final JTable tabla = new JTable(new ProductosModel());
     private final ProductosModel modelo = (ProductosModel) tabla.getModel();
+
+    // === NUEVO: DAO para persistencia ===
+    private final ProductDao dao = new ProductDao();
 
     private final String currentUser = "admin"; // reemplaza por el usuario logueado si lo tienes
 
@@ -42,25 +49,37 @@ public class InventarioPanel extends JPanel {
         top.add(btnEntrada);
         top.add(btnSalida);
         top.add(btnAjuste);
-        top.add(btnHistorial); // ← NUEVO
+        top.add(btnHistorial);
         add(top, BorderLayout.NORTH);
 
         tabla.setRowHeight(22);
         tabla.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         add(new JScrollPane(tabla), BorderLayout.CENTER);
 
+        // Asegura tabla y carga datos
+        try { dao.createTableIfNotExists(); } catch (SQLException e) { e.printStackTrace(); }
         recargar();
 
         btnBuscar.addActionListener(e -> filtrar());
         btnEntrada.addActionListener(e -> onEntradaCrearOSumar());
         btnSalida.addActionListener(e -> onSalida());
         btnAjuste.addActionListener(e -> onAjuste());
-        btnHistorial.addActionListener(e -> openHistorial()); // ← NUEVO
+        btnHistorial.addActionListener(e -> openHistorial());
     }
 
     // ================== UI helpers ==================
 
+    // === CAMBIO: si la memoria está vacía, trae desde BD y la rellena ===
     private void recargar() {
+        if (InMemoryStore.getAllProducts().isEmpty()) {
+            try {
+                for (Product pr : dao.listAll()) {
+                    InMemoryStore.addProduct(pr);
+                }
+            } catch (SQLException ex) {
+                System.err.println("InventarioPanel: no se pudo leer BD: " + ex.getMessage());
+            }
+        }
         modelo.set(InMemoryStore.getAllProducts());
     }
 
@@ -152,6 +171,8 @@ public class InventarioPanel extends JPanel {
 
             prod = new Product(code, name, cat.isEmpty() ? "General" : cat, price, 0, exp);
             InMemoryStore.addProduct(prod);
+            // === NUEVO: persistir creación/edición ===
+            try { dao.upsert(prod); } catch (SQLException e) { e.printStackTrace(); }
         }
 
         int qty = (int) spQty.getValue();
@@ -161,6 +182,8 @@ public class InventarioPanel extends JPanel {
         m.applyToProduct();
         InMemoryMovementRepository.getInstance().add(m);
         InMemoryStore.updateProduct(prod); // por si tu store no es por referencia
+        // === NUEVO: persistir después de aplicar movimiento ===
+        try { dao.upsert(prod); } catch (SQLException e) { e.printStackTrace(); }
 
         info("Entrada aplicada al producto " + prod.getName()
                 + ". Stock: " + m.getPreviousStock() + " → " + m.getResultingStock());
@@ -194,6 +217,8 @@ public class InventarioPanel extends JPanel {
         m.applyToProduct();
         InMemoryMovementRepository.getInstance().add(m);
         InMemoryStore.updateProduct(p);
+        // === NUEVO: persistir salida ===
+        try { dao.upsert(p); } catch (SQLException e) { e.printStackTrace(); }
 
         info("Salida aplicada.\nStock: " + m.getPreviousStock() + " → " + m.getResultingStock());
         recargar();
@@ -270,6 +295,7 @@ public class InventarioPanel extends JPanel {
 
         // Persistir y refrescar
         InMemoryStore.updateProduct(p);
+        try { dao.upsert(p); } catch (SQLException e) { e.printStackTrace(); } // === NUEVO ===
         recargar();
 
         // Feedback
@@ -284,7 +310,7 @@ public class InventarioPanel extends JPanel {
         }
     }
 
-    // ==== NUEVO: abrir historial de movimientos ====
+    // ==== abrir historial de movimientos ====
     private void openHistorial() {
         JDialog d = new JDialog(SwingUtilities.getWindowAncestor(this),
                 "Historial de Movimientos", Dialog.ModalityType.MODELESS);
@@ -326,5 +352,4 @@ public class InventarioPanel extends JPanel {
         }
     }
 }
-
 

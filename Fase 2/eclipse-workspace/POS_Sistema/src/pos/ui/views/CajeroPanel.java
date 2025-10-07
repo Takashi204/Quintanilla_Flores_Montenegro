@@ -6,6 +6,14 @@ import pos.model.SaleItem;
 import pos.repo.SaleRepo;
 import pos.store.InMemoryStore;
 
+// 🎯 EXIT en historial
+import pos.model.InventoryMovement;
+import pos.repo.InMemoryMovementRepository;
+
+// 🎯 NUEVO: persistencia SQLite
+import pos.db.ProductDao;
+import java.sql.SQLException;
+
 import javax.swing.*;
 import javax.swing.table.AbstractTableModel;
 import java.awt.*;
@@ -35,13 +43,13 @@ public class CajeroPanel extends JPanel {
             NumberFormat.getCurrencyInstance(new Locale("es","CL"));
     private static long FOLIO = 10000;
 
+    // Usuario actual (ajusta si tienes login real)
+    private final String currentUser = "cajero";
+
     public CajeroPanel() {
         setLayout(new BorderLayout(10,10));
         setBackground(new Color(0xF3F4F6));
 
-        // (Se quitó el título duplicado aquí)
-
-        // Layout principal izquierda/derecha
         JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
         split.setResizeWeight(0.5);
         split.setBorder(null);
@@ -52,7 +60,7 @@ public class CajeroPanel extends JPanel {
         // Carga inventario
         ((InvModel)tblInv.getModel()).reload();
 
-        // Doble click en inventario -> agrega al carrito
+        // Doble click inventario -> agrega al carrito
         tblInv.addMouseListener(new java.awt.event.MouseAdapter() {
             public void mouseClicked(java.awt.event.MouseEvent e) {
                 if (e.getClickCount()==2) agregarProductoSeleccionado();
@@ -224,20 +232,39 @@ public class CajeroPanel extends JPanel {
             } catch (Exception e) { return; }
         }
 
-        // Descontar stock
-        for (Item it : itemsModel.data) {
+        // Generar folio antes (para usarlo en motivo)
+        long folio = ++FOLIO;
+
+        // 🎯 NUEVO: preparar DAO y asegurar tabla
+        ProductDao dao = new ProductDao();
+        try { dao.createTableIfNotExists(); } catch (SQLException e) { e.printStackTrace(); }
+
+        // 🎯 NUEVO: Descontar stock + EXIT + persistir en SQLite
+        for (Item it : itemsModel.getItems()) {
             Optional<Product> inv = InMemoryStore.findByCode(it.product.getCode());
             inv.ifPresent(prod -> {
-                prod.setStock(Math.max(0, prod.getStock() - it.qty));
-                InMemoryStore.update(prod);
+                // Registro de salida (historial)
+                InventoryMovement m = InventoryMovement.exit(
+                        prod,
+                        it.qty,
+                        "Venta POS #" + folio,
+                        currentUser
+                );
+                m.applyToProduct(); // aplica y evita negativos
+                InMemoryMovementRepository.getInstance().add(m);
+
+                // Actualizar memoria
+                InMemoryStore.update(prod); // o updateProduct(prod)
+
+                // Persistir en SQLite
+                try { dao.upsert(prod); } catch (SQLException e) { e.printStackTrace(); }
             });
         }
         ((InvModel)tblInv.getModel()).reload();
 
-        // Guardar venta
-        long folio = ++FOLIO;
+        // Guardar venta (tu lógica original)
         List<SaleItem> repoItems = new ArrayList<>();
-        for (Item it : itemsModel.data) {
+        for (Item it : itemsModel.getItems()) {
             Product p = it.product;
             Product copy = new Product(p.getCode(), p.getName(), p.getCategory(), p.getPrice(), p.getStock(), p.getExpiry());
             repoItems.add(new SaleItem(copy, it.qty));
@@ -362,3 +389,4 @@ public class CajeroPanel extends JPanel {
         List<Item> getItems(){ return new ArrayList<>(data); }
     }
 }
+

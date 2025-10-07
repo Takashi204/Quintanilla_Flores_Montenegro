@@ -4,6 +4,9 @@ import javax.swing.*;
 import java.awt.*;
 import java.util.function.Consumer;
 
+
+import pos.login.LoginFrame;
+
 public class Sidebar extends JPanel {
 
     public Sidebar(Consumer<String> onNavigate, String role, String username) {
@@ -26,7 +29,6 @@ public class Sidebar extends JPanel {
         // --- Botones comunes (SIN Productos) ---
         addBtn(c, "Dashboard",  () -> onNavigate.accept(MainFrame.DASHBOARD));
         addBtn(c, "Ventas",     () -> onNavigate.accept(MainFrame.VENTAS));
-        // (Eliminado) addBtn(c, "Productos",  () -> onNavigate.accept(MainFrame.PRODUCTOS));
         addBtn(c, "Clientes",   () -> onNavigate.accept(MainFrame.CLIENTES));
         addBtn(c, "Inventario", () -> onNavigate.accept(MainFrame.INVENTARIO));
         addBtn(c, "Reportes",   () -> onNavigate.accept(MainFrame.REPORTES));
@@ -37,6 +39,14 @@ public class Sidebar extends JPanel {
             addBtn(c, "Usuarios", () -> onNavigate.accept(MainFrame.USUARIOS));
             addBtn(c, "Ajustes",  () -> onNavigate.accept(MainFrame.AJUSTES));
         }
+
+        // Cerrar sesión
+        addSeparator(c);
+        addBtn(c, "Cerrar sesión", () -> {
+            Window w = SwingUtilities.getWindowAncestor(this);
+            if (w != null) w.dispose();
+            SwingUtilities.invokeLater(() -> new LoginFrame().setVisible(true));
+        });
 
         // Empujar el footer al final
         c.weighty = 1;

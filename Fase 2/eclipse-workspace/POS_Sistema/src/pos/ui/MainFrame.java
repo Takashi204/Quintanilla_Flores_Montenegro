@@ -4,6 +4,9 @@ import pos.ui.views.*;
 import javax.swing.*;
 import java.awt.*;
 
+
+import pos.login.LoginFrame;
+
 public class MainFrame extends JFrame {
 
     private final CardLayout card = new CardLayout();
@@ -12,7 +15,7 @@ public class MainFrame extends JFrame {
 
     public static final String DASHBOARD   = "dashboard";
     public static final String VENTAS      = "ventas";
-    public static final String PRODUCTOS   = "productos";
+    public static final String PRODUCTOS   = "productos"; // ok si no se usa
     public static final String CLIENTES    = "clientes";
     public static final String INVENTARIO  = "inventario";
     public static final String REPORTES    = "reportes";
@@ -38,7 +41,7 @@ public class MainFrame extends JFrame {
             add(sidebar, BorderLayout.WEST);
 
             content.add(new DashboardPanel(), DASHBOARD);
-            content.add(new CajeroPanel(), VENTAS);        
+            content.add(new CajeroPanel(), VENTAS);
             content.add(new ClientesPanel(), CLIENTES);
             content.add(new InventarioPanel(), INVENTARIO);
 
@@ -53,15 +56,29 @@ public class MainFrame extends JFrame {
 
         } else {
             // ====== MODO CAJERO: SIN sidebar, pantalla solo Cajero ======
-            // Barra superior muy simple (título + usuario)
             JPanel top = new JPanel(new BorderLayout());
+
             JLabel title = new JLabel("Cajero");
             title.setBorder(BorderFactory.createEmptyBorder(8,12,8,12));
             title.setFont(title.getFont().deriveFont(Font.BOLD, 18f));
+            top.add(title, BorderLayout.WEST);
+
+            // Usuario + botón Cerrar sesión
             JLabel user = new JLabel("Usuario: " + username + "  |  Rol: CAJERO");
             user.setBorder(BorderFactory.createEmptyBorder(8,12,8,12));
-            top.add(title, BorderLayout.WEST);
-            top.add(user, BorderLayout.EAST);
+
+            JButton btnLogout = new JButton("Cerrar sesión");
+            btnLogout.addActionListener(e -> {
+                this.dispose();
+                SwingUtilities.invokeLater(() -> new LoginFrame().setVisible(true));
+            });
+
+            JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+            right.setOpaque(false);
+            right.add(user);
+            right.add(btnLogout);
+            top.add(right, BorderLayout.EAST);
+
             add(top, BorderLayout.NORTH);
 
             // Solo registramos el CajeroPanel como "VENTAS"
