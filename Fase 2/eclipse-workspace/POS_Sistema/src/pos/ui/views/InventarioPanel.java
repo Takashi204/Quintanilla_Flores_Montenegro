@@ -2,21 +2,21 @@ package pos.ui.views;
 
 import pos.model.InventoryMovement;
 import pos.model.Product;
-import pos.repo.InMemoryMovementRepository;
-import pos.store.InMemoryStore;
 
 import javax.swing.*;
 import javax.swing.table.AbstractTableModel;
 import java.awt.*;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-// === NUEVO: imports para BD ===
-import pos.db.ProductDao;
-import java.sql.SQLException;
+// ==== DAOs ====
+import pos.dao.InventoryDao;
+import pos.dao.MovementDao;
 
 public class InventarioPanel extends JPanel {
 
@@ -28,14 +28,16 @@ public class InventarioPanel extends JPanel {
     private final JButton btnEntrada   = new JButton("Entrada (+)");
     private final JButton btnSalida    = new JButton("Salida (−)");
     private final JButton btnAjuste    = new JButton("Ajuste");
-    private final JButton btnHistorial = new JButton("Historial"); // ← ya lo tenías
+    private final JButton btnHistorial = new JButton("Historial");
+    private final JButton btnEliminar  = new JButton("Eliminar");
 
     // Tabla
     private final JTable tabla = new JTable(new ProductosModel());
     private final ProductosModel modelo = (ProductosModel) tabla.getModel();
 
-    // === NUEVO: DAO para persistencia ===
-    private final ProductDao dao = new ProductDao();
+    // DAOs
+    private final InventoryDao dao = new InventoryDao();
+    private final MovementDao movementDao = new MovementDao();
 
     private final String currentUser = "admin"; // reemplaza por el usuario logueado si lo tienes
 
@@ -50,14 +52,14 @@ public class InventarioPanel extends JPanel {
         top.add(btnSalida);
         top.add(btnAjuste);
         top.add(btnHistorial);
+        top.add(btnEliminar);
         add(top, BorderLayout.NORTH);
 
         tabla.setRowHeight(22);
         tabla.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         add(new JScrollPane(tabla), BorderLayout.CENTER);
 
-        // Asegura tabla y carga datos
-        try { dao.createTableIfNotExists(); } catch (SQLException e) { e.printStackTrace(); }
+        // Carga inicial desde BD
         recargar();
 
         btnBuscar.addActionListener(e -> filtrar());
@@ -65,29 +67,24 @@ public class InventarioPanel extends JPanel {
         btnSalida.addActionListener(e -> onSalida());
         btnAjuste.addActionListener(e -> onAjuste());
         btnHistorial.addActionListener(e -> openHistorial());
+        btnEliminar.addActionListener(e -> onDelete());
     }
 
     // ================== UI helpers ==================
 
-    // === CAMBIO: si la memoria está vacía, trae desde BD y la rellena ===
+    /** Recarga SIEMPRE desde BD y actualiza el modelo. */
     private void recargar() {
-        if (InMemoryStore.getAllProducts().isEmpty()) {
-            try {
-                for (Product pr : dao.listAll()) {
-                    InMemoryStore.addProduct(pr);
-                }
-            } catch (SQLException ex) {
-                System.err.println("InventarioPanel: no se pudo leer BD: " + ex.getMessage());
-            }
-        }
-        modelo.set(InMemoryStore.getAllProducts());
+        List<Product> datos = dao.listAll();
+        modelo.set(datos);
     }
 
     private void filtrar() {
         String q = txtBuscar.getText().trim().toLowerCase();
         if (q.isEmpty()) { recargar(); return; }
-        List<Product> list = InMemoryStore.getAllProducts().stream()
-                .filter(p -> p.getName().toLowerCase().contains(q) || p.getCode().toLowerCase().contains(q))
+        List<Product> base = dao.listAll();
+        List<Product> list = base.stream()
+                .filter(p -> (p.getName()!=null && p.getName().toLowerCase().contains(q))
+                          || (p.getCode()!=null && p.getCode().toLowerCase().contains(q)))
                 .collect(Collectors.toList());
         modelo.set(list);
     }
@@ -98,25 +95,18 @@ public class InventarioPanel extends JPanel {
         return modelo.getAt(row);
     }
 
+    /** Busca por código directamente en BD. */
     private Product findByCode(String code) {
-        if (code == null) return null;
-        for (Product p : InMemoryStore.getAllProducts()) {
-            if (code.equalsIgnoreCase(p.getCode())) return p;
-        }
-        return null;
+        if (code == null || code.isBlank()) return null;
+        return dao.findByCode(code.trim());
     }
 
     private int parseIntSafe(String s, int def) {
         try { return Integer.parseInt(s.trim()); } catch (Exception e) { return def; }
     }
 
-    private void warn(String msg) {
-        JOptionPane.showMessageDialog(this, msg, "Atención", JOptionPane.WARNING_MESSAGE);
-    }
-
-    private void info(String msg) {
-        JOptionPane.showMessageDialog(this, msg, "OK", JOptionPane.INFORMATION_MESSAGE);
-    }
+    private void warn(String msg) { JOptionPane.showMessageDialog(this, msg, "Atención", JOptionPane.WARNING_MESSAGE); }
+    private void info(String msg) { JOptionPane.showMessageDialog(this, msg, "OK", JOptionPane.INFORMATION_MESSAGE); }
 
     private JPanel form2(String l1, JComponent c1, String l2, JComponent c2) {
         JPanel p = new JPanel(new GridLayout(0,2,6,6));
@@ -125,12 +115,23 @@ public class InventarioPanel extends JPanel {
         return p;
     }
 
+    /** Calcula el siguiente código correlativo mirando la BD. */
+    private String nextCodeFromDb() {
+        return dao.listAll().stream()
+                .map(Product::getCode)
+                .filter(Objects::nonNull)
+                .filter(c -> c.matches("\\d+"))
+                .mapToInt(Integer::parseInt)
+                .max()
+                .orElse(1000) + 1 + "";
+    }
+
     // ================== Operaciones ==================
 
     /** Entrada: si existe el código suma stock; si no existe, crea y luego entra stock. */
     private void onEntradaCrearOSumar() {
         // --- Campos del formulario ---
-        JTextField txtCode  = new JTextField(InMemoryStore.nextCode());
+        JTextField txtCode  = new JTextField(nextCodeFromDb());
         JTextField txtName  = new JTextField();
         JTextField txtCat   = new JTextField("General");
         JTextField txtPrice = new JTextField("0");
@@ -152,9 +153,9 @@ public class InventarioPanel extends JPanel {
         String code = txtCode.getText().trim();
         if (code.isEmpty()) { warn("El código es obligatorio."); return; }
 
-        Product prod = findByCode(code);
+        Product prod = findByCode(code); // ← busca en BD
 
-        // Si NO existe -> crear producto (nombre obligatorio)
+        // Si NO existe -> crear producto (nombre obligatorio) y persistir INSERT
         if (prod == null) {
             String name = txtName.getText().trim();
             if (name.isEmpty()) { warn("El nombre es obligatorio para nuevos productos."); return; }
@@ -170,20 +171,31 @@ public class InventarioPanel extends JPanel {
             }
 
             prod = new Product(code, name, cat.isEmpty() ? "General" : cat, price, 0, exp);
-            InMemoryStore.addProduct(prod);
-            // === NUEVO: persistir creación/edición ===
-            try { dao.upsert(prod); } catch (SQLException e) { e.printStackTrace(); }
+            dao.insert(prod); // ← INSERT (devuelve id cuando es posible)
+
+            // Fallback por si no quedó id
+            if (prod.getId() == 0) {
+                Product db = dao.findByCode(prod.getCode());
+                if (db != null) prod.setId(db.getId());
+            }
         }
 
         int qty = (int) spQty.getValue();
         String reason = txtReason.getText().isBlank() ? "Entrada" : txtReason.getText().trim();
 
+        // Movimiento y actualización de stock
         InventoryMovement m = InventoryMovement.entry(prod, qty, reason, currentUser);
-        m.applyToProduct();
-        InMemoryMovementRepository.getInstance().add(m);
-        InMemoryStore.updateProduct(prod); // por si tu store no es por referencia
-        // === NUEVO: persistir después de aplicar movimiento ===
-        try { dao.upsert(prod); } catch (SQLException e) { e.printStackTrace(); }
+        m.applyToProduct(); // sólo modifica el objeto en memoria
+
+        // Guardar movimiento en BD
+        movementDao.insert(
+                prod.getCode(), "ENTRY", qty,
+                m.getPreviousStock(), m.getResultingStock(),
+                reason, currentUser, LocalDateTime.now()
+        );
+
+        // Persistir UPDATE con nuevo stock
+        dao.update(prod);
 
         info("Entrada aplicada al producto " + prod.getName()
                 + ". Stock: " + m.getPreviousStock() + " → " + m.getResultingStock());
@@ -215,10 +227,16 @@ public class InventarioPanel extends JPanel {
 
         InventoryMovement m = InventoryMovement.exit(p, qty, reason, currentUser);
         m.applyToProduct();
-        InMemoryMovementRepository.getInstance().add(m);
-        InMemoryStore.updateProduct(p);
-        // === NUEVO: persistir salida ===
-        try { dao.upsert(p); } catch (SQLException e) { e.printStackTrace(); }
+
+        // Guardar movimiento en BD
+        movementDao.insert(
+                p.getCode(), "EXIT", qty,
+                m.getPreviousStock(), m.getResultingStock(),
+                reason, currentUser, LocalDateTime.now()
+        );
+
+        // Persistir UPDATE tras salida
+        dao.update(p);
 
         info("Salida aplicada.\nStock: " + m.getPreviousStock() + " → " + m.getResultingStock());
         recargar();
@@ -290,12 +308,17 @@ public class InventarioPanel extends JPanel {
         if (stockChanged) {
             InventoryMovement m = InventoryMovement.adjustment(p, newStock, reason, currentUser);
             m.applyToProduct();
-            InMemoryMovementRepository.getInstance().add(m);
+
+            // Guardar movimiento en BD
+            movementDao.insert(
+                    p.getCode(), "ADJUST", Math.abs(newStock - m.getPreviousStock()),
+                    m.getPreviousStock(), m.getResultingStock(),
+                    reason, currentUser, LocalDateTime.now()
+            );
         }
 
         // Persistir y refrescar
-        InMemoryStore.updateProduct(p);
-        try { dao.upsert(p); } catch (SQLException e) { e.printStackTrace(); } // === NUEVO ===
+        dao.update(p);
         recargar();
 
         // Feedback
@@ -310,11 +333,51 @@ public class InventarioPanel extends JPanel {
         }
     }
 
+    // ==== eliminar producto ====
+    private void onDelete() {
+        Product p = getSeleccionado();
+        if (p == null) { warn("Selecciona un producto."); return; }
+
+        String extra = p.getStock() > 0
+                ? "\n\n⚠️ El producto tiene stock (" + p.getStock() + "). Se registrará un movimiento DELETE a stock 0."
+                : "";
+        int r = JOptionPane.showConfirmDialog(
+                this,
+                "¿Eliminar el producto \"" + p.getName() + "\" (" + p.getCode() + ")?"
+                        + "\nEsta acción no se puede deshacer." + extra,
+                "Confirmar eliminación",
+                JOptionPane.YES_NO_OPTION
+        );
+        if (r != JOptionPane.YES_OPTION) return;
+
+        // Guardar movimiento DELETE (prev_stock -> 0)
+        movementDao.insert(
+                p.getCode(), "DELETE", Math.max(0, p.getStock()),
+                p.getStock(), 0,
+                "Eliminación de producto", currentUser, LocalDateTime.now()
+        );
+
+        // Eliminar en BD
+        if (p.getId() > 0) {
+            dao.delete(p.getId());
+        } else {
+            Product db = dao.findByCode(p.getCode());
+            if (db != null) dao.delete(db.getId());
+        }
+
+        info("Producto eliminado.");
+        recargar();
+    }
+
     // ==== abrir historial de movimientos ====
     private void openHistorial() {
+        String preset = "";
+        Product sel = getSeleccionado();
+        if (sel != null) preset = sel.getCode();
+
         JDialog d = new JDialog(SwingUtilities.getWindowAncestor(this),
                 "Historial de Movimientos", Dialog.ModalityType.MODELESS);
-        d.setContentPane(new MovementsPanel());
+        d.setContentPane(new MovementsPanel(preset)); // pasa el código seleccionado
         d.setSize(900, 500);
         d.setLocationRelativeTo(this);
         d.setVisible(true);
@@ -352,4 +415,3 @@ public class InventarioPanel extends JPanel {
         }
     }
 }
-

@@ -4,15 +4,10 @@ import pos.model.Product;
 import pos.model.Sale;
 import pos.model.SaleItem;
 import pos.repo.SaleRepo;
-import pos.store.InMemoryStore;
 
-// 🎯 EXIT en historial
-import pos.model.InventoryMovement;
-import pos.repo.InMemoryMovementRepository;
-
-// 🎯 NUEVO: persistencia SQLite
-import pos.db.ProductDao;
-import java.sql.SQLException;
+// SQLite DAOs
+import pos.dao.InventoryDao;
+import pos.dao.MovementDao;
 
 import javax.swing.*;
 import javax.swing.table.AbstractTableModel;
@@ -46,6 +41,10 @@ public class CajeroPanel extends JPanel {
     // Usuario actual (ajusta si tienes login real)
     private final String currentUser = "cajero";
 
+    // DAOs BD
+    private final InventoryDao inventoryDao = new InventoryDao();
+    private final MovementDao  movementDao  = new MovementDao();
+
     public CajeroPanel() {
         setLayout(new BorderLayout(10,10));
         setBackground(new Color(0xF3F4F6));
@@ -57,7 +56,7 @@ public class CajeroPanel extends JPanel {
         split.setRightComponent(buildRight());
         add(split, BorderLayout.CENTER);
 
-        // Carga inventario
+        // Carga inventario desde BD
         ((InvModel)tblInv.getModel()).reload();
 
         // Doble click inventario -> agrega al carrito
@@ -235,34 +234,40 @@ public class CajeroPanel extends JPanel {
         // Generar folio antes (para usarlo en motivo)
         long folio = ++FOLIO;
 
-        // 🎯 NUEVO: preparar DAO y asegurar tabla
-        ProductDao dao = new ProductDao();
-        try { dao.createTableIfNotExists(); } catch (SQLException e) { e.printStackTrace(); }
-
-        // 🎯 NUEVO: Descontar stock + EXIT + persistir en SQLite
+        // === Descontar stock en BD y registrar movimientos EXIT ===
         for (Item it : itemsModel.getItems()) {
-            Optional<Product> inv = InMemoryStore.findByCode(it.product.getCode());
-            inv.ifPresent(prod -> {
-                // Registro de salida (historial)
-                InventoryMovement m = InventoryMovement.exit(
-                        prod,
-                        it.qty,
-                        "Venta POS #" + folio,
-                        currentUser
-                );
-                m.applyToProduct(); // aplica y evita negativos
-                InMemoryMovementRepository.getInstance().add(m);
+            String code = it.product.getCode();
+            int qty = it.qty;
 
-                // Actualizar memoria
-                InMemoryStore.update(prod); // o updateProduct(prod)
+            Product dbp = inventoryDao.findByCode(code);
+            if (dbp == null) {
+                System.err.println("Producto no encontrado en BD: " + code);
+                continue;
+            }
 
-                // Persistir en SQLite
-                try { dao.upsert(prod); } catch (SQLException e) { e.printStackTrace(); }
-            });
+            int prev  = dbp.getStock();
+            int nuevo = prev - qty;
+            if (nuevo < 0) nuevo = 0;
+
+            dbp.setStock(nuevo);
+            inventoryDao.update(dbp);
+
+            movementDao.insert(
+                dbp.getCode(),
+                "EXIT",
+                qty,
+                prev,
+                nuevo,
+                "Venta POS #" + folio,
+                currentUser,
+                LocalDateTime.now()
+            );
         }
+
+        // Refrescar inventario mostrado
         ((InvModel)tblInv.getModel()).reload();
 
-        // Guardar venta (tu lógica original)
+        // Guardar venta (lógico original)
         List<SaleItem> repoItems = new ArrayList<>();
         for (Item it : itemsModel.getItems()) {
             Product p = it.product;
@@ -313,17 +318,21 @@ public class CajeroPanel extends JPanel {
     private int parseInt(String s){ return (s==null||s.isBlank())?0:Integer.parseInt(s.trim()); }
 
     // ===== Modelos =====
-    private static class InvModel extends AbstractTableModel {
+    private class InvModel extends AbstractTableModel {
         private final String[] cols = {"Código","Nombre","Categoría","Precio","Stock"};
         private java.util.List<Product> data = new ArrayList<>();
-        void reload(){ data = new ArrayList<>(InMemoryStore.allProducts()); fireTableDataChanged(); }
+
+        void reload(){
+            data = new ArrayList<>(inventoryDao.listAll());
+            fireTableDataChanged();
+        }
         void search(String code, String name){
-            List<Product> base = InMemoryStore.allProducts();
+            List<Product> base = inventoryDao.listAll();
             data = new ArrayList<>();
             for (Product p : base) {
                 boolean ok = true;
-                if (!code.isBlank())  ok &= p.getCode().toLowerCase().contains(code.toLowerCase());
-                if (!name.isBlank())  ok &= p.getName().toLowerCase().contains(name.toLowerCase());
+                if (!code.isBlank())  ok &= p.getCode() != null && p.getCode().toLowerCase().contains(code.toLowerCase());
+                if (!name.isBlank())  ok &= p.getName() != null && p.getName().toLowerCase().contains(name.toLowerCase());
                 if (ok) data.add(p);
             }
             fireTableDataChanged();
@@ -389,4 +398,3 @@ public class CajeroPanel extends JPanel {
         List<Item> getItems(){ return new ArrayList<>(data); }
     }
 }
-

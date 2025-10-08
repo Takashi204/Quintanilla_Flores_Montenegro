@@ -4,8 +4,8 @@ import pos.ui.views.*;
 import javax.swing.*;
 import java.awt.*;
 
-
 import pos.login.LoginFrame;
+import pos.db.DatabaseInit;
 
 public class MainFrame extends JFrame {
 
@@ -15,18 +15,20 @@ public class MainFrame extends JFrame {
 
     public static final String DASHBOARD   = "dashboard";
     public static final String VENTAS      = "ventas";
-    public static final String PRODUCTOS   = "productos"; // ok si no se usa
+    public static final String PRODUCTOS   = "productos";
     public static final String CLIENTES    = "clientes";
     public static final String INVENTARIO  = "inventario";
     public static final String REPORTES    = "reportes";
     public static final String USUARIOS    = "usuarios";
     public static final String AJUSTES     = "ajustes";
 
-    // Solo la usaremos en ADMIN
     private ReportesPanel reportesPanel;
 
     public MainFrame(String username, String role) {
         this.roleGlobal = role;
+
+        // 👇 AÑADE ESTA LÍNEA: asegura el esquema de BD al iniciar la app
+        DatabaseInit.initialize();
 
         boolean admin = isAdmin();
         setTitle("Almacén Sonia — POS" + (admin ? " [ADMIN]" : " [CAJERO]"));
@@ -36,7 +38,6 @@ public class MainFrame extends JFrame {
         setLayout(new BorderLayout());
 
         if (admin) {
-            // ====== MODO ADMIN: con Sidebar y todas las vistas ======
             Sidebar sidebar = new Sidebar(this::showView, roleGlobal, username);
             add(sidebar, BorderLayout.WEST);
 
@@ -55,7 +56,6 @@ public class MainFrame extends JFrame {
             showView(DASHBOARD);
 
         } else {
-            // ====== MODO CAJERO: SIN sidebar, pantalla solo Cajero ======
             JPanel top = new JPanel(new BorderLayout());
 
             JLabel title = new JLabel("Cajero");
@@ -63,7 +63,6 @@ public class MainFrame extends JFrame {
             title.setFont(title.getFont().deriveFont(Font.BOLD, 18f));
             top.add(title, BorderLayout.WEST);
 
-            // Usuario + botón Cerrar sesión
             JLabel user = new JLabel("Usuario: " + username + "  |  Rol: CAJERO");
             user.setBorder(BorderFactory.createEmptyBorder(8,12,8,12));
 
@@ -81,7 +80,6 @@ public class MainFrame extends JFrame {
 
             add(top, BorderLayout.NORTH);
 
-            // Solo registramos el CajeroPanel como "VENTAS"
             content.add(new CajeroPanel(), VENTAS);
             add(content, BorderLayout.CENTER);
             showView(VENTAS);
@@ -89,7 +87,6 @@ public class MainFrame extends JFrame {
     }
 
     public void showView(String key) {
-        // En modo cajero no hay restricciones: solo existe VENTAS
         if (!isAdmin() && (USUARIOS.equals(key) || AJUSTES.equals(key))) {
             JOptionPane.showMessageDialog(this,
                     "Permiso denegado (solo ADMIN).",
@@ -99,7 +96,6 @@ public class MainFrame extends JFrame {
         }
         card.show(content, key);
 
-        // Refrescar Reportes al abrir (solo si estamos en admin y existe el panel)
         if (isAdmin() && REPORTES.equals(key) && reportesPanel != null) {
             reportesPanel.reload();
         }

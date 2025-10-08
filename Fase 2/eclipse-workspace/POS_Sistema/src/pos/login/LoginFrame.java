@@ -22,12 +22,12 @@ public class LoginFrame extends JFrame {
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
 
-        // Fondo principal (gris claro)
+        
         JPanel bg = new JPanel(new GridBagLayout());
         bg.setBackground(new Color(0xF5F7FA));
         add(bg, BorderLayout.CENTER);
 
-        // Panel blanco para el login (card)
+       
         JPanel card = new JPanel(null);
         card.setPreferredSize(new Dimension(380, 340));
         card.setBackground(Color.WHITE);
@@ -42,7 +42,7 @@ public class LoginFrame extends JFrame {
         lblTitle.setBounds(100, 18, 180, 30);
         card.add(lblTitle);
 
-        // ----- Usuario
+      
         JLabel lblUser = new JLabel("Usuario");
         lblUser.setForeground(new Color(0x374151));
         lblUser.setBounds(40, 64, 300, 18);
@@ -53,7 +53,7 @@ public class LoginFrame extends JFrame {
         styleField(txtUser);
         card.add(txtUser);
 
-        // ----- Contraseña
+     
         JLabel lblPass = new JLabel("Contraseña");
         lblPass.setForeground(new Color(0x374151));
         lblPass.setBounds(40, 122, 300, 18);
@@ -72,7 +72,7 @@ public class LoginFrame extends JFrame {
         show.addActionListener(e -> txtPass.setEchoChar(show.isSelected() ? 0 : '\u2022'));
         card.add(show);
 
-        // ----- Rol
+     
         rAdmin   = new JRadioButton("Administrador");
         rCashier = new JRadioButton("Cajero");
         for (JRadioButton rb : new JRadioButton[]{rAdmin, rCashier}) {
@@ -85,26 +85,26 @@ public class LoginFrame extends JFrame {
         ButtonGroup group = new ButtonGroup();
         group.add(rAdmin);
         group.add(rCashier);
-        rCashier.setSelected(true); // por defecto Cajero
+        rCashier.setSelected(true); 
 
         card.add(rAdmin);
         card.add(rCashier);
 
-        // ----- Mensaje de error
+       
         lblError = new JLabel(" ", SwingConstants.CENTER);
         lblError.setForeground(new Color(0xDC2626)); // rojo 600
         lblError.setFont(new Font("SansSerif", Font.PLAIN, 12));
         lblError.setBounds(40, 226, 300, 16);
         card.add(lblError);
 
-        // ----- Botón redondeado
+       
         btnLogin = new RoundedButton("Ingresar");
         btnLogin.setBounds(120, 252, 140, 40);
-        btnLogin.setEnabled(false); // se habilita con validación
+        btnLogin.setEnabled(false); 
         card.add(btnLogin);
         btnLogin.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
-        // Columna izquierda (branding)
+        
         JPanel left = new JPanel();
         left.setOpaque(false);
         left.setLayout(new BoxLayout(left, BoxLayout.Y_AXIS));
@@ -121,7 +121,7 @@ public class LoginFrame extends JFrame {
         left.add(Box.createVerticalStrut(8));
         left.add(t2);
 
-        // Añadir al fondo
+        
         GridBagConstraints gc = new GridBagConstraints();
         gc.insets = new Insets(20, 40, 20, 40);
         gc.gridx = 0; gc.gridy = 0;
@@ -130,7 +130,7 @@ public class LoginFrame extends JFrame {
         gc.gridx = 1;
         bg.add(card, gc);
 
-        // Acciones
+        
         DocumentListenerSimple dl = new DocumentListenerSimple(this::validateForm);
         txtUser.getDocument().addDocumentListener(dl);
         txtPass.getDocument().addDocumentListener(dl);
@@ -139,15 +139,15 @@ public class LoginFrame extends JFrame {
         btnLogin.addActionListener(e -> doLogin());
     }
 
-    /** Valida campos y habilita/deshabilita el botón. */
+    
     private void validateForm() {
         boolean ok = !txtUser.getText().trim().isEmpty()
                   && txtPass.getPassword().length > 0;
         btnLogin.setEnabled(ok);
-        lblError.setText(" "); // limpio el error si el usuario corrige
+        lblError.setText(" "); 
     }
 
-    /** DEMO front-end: acepta cualquier usuario/clave y abre el Main. */
+   
     private void doLogin() {
         String user = txtUser.getText().trim();
         String pass = new String(txtPass.getPassword());
@@ -157,7 +157,7 @@ public class LoginFrame extends JFrame {
             return;
         }
 
-        // Etiqueta para el mensaje y código para la app
+       
         String roleCode  = rAdmin.isSelected() ? "ADMIN" : "CAJERO";
         String roleLabel = rAdmin.isSelected() ? "Administrador" : "Cajero";
 
@@ -166,14 +166,14 @@ public class LoginFrame extends JFrame {
                 "Login correcto",
                 JOptionPane.PLAIN_MESSAGE);
 
-        // 👉 Abrir Main y cerrar login (solo front-end, sin BD)
+        
         SwingUtilities.invokeLater(() -> {
-            dispose(); // cierra login
-            new MainFrame(user, roleCode).setVisible(true); // abre el Main
+            dispose(); 
+            new MainFrame(user, roleCode).setVisible(true); 
         });
     }
 
-    // ---------- helpers de estilo ----------
+    
     private void styleField(JTextField field) {
         field.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(new Color(0xD1D5DB), 1, true),
@@ -196,12 +196,12 @@ public class LoginFrame extends JFrame {
         });
     }
 
-    /** Botón redondeado con colores y estados (normal/hover/pressed/disabled). */
+   
     private static class RoundedButton extends JButton {
-        private Color normal   = new Color(0x2563EB); // azul
+        private Color normal   = new Color(0x2563EB); 
         private Color hover    = new Color(0x1D4ED8);
         private Color pressed  = new Color(0x1E40AF);
-        private Color disabled = new Color(0x9CA3AF); // gris
+        private Color disabled = new Color(0x9CA3AF); 
 
         private int arc = 12;
         private boolean isHover = false;
@@ -238,7 +238,7 @@ public class LoginFrame extends JFrame {
             g2.setColor(bg);
             g2.fillRoundRect(0, 0, getWidth(), getHeight(), arc, arc);
 
-            // Texto centrado
+           
             FontMetrics fm = g2.getFontMetrics();
             int x = (getWidth() - fm.stringWidth(getText())) / 2;
             int y = (getHeight() - fm.getHeight()) / 2 + fm.getAscent();
@@ -249,7 +249,7 @@ public class LoginFrame extends JFrame {
         }
     }
 
-    /** Listener simple para no repetir código. */
+    
     private static class DocumentListenerSimple implements javax.swing.event.DocumentListener {
         private final Runnable cb;
         DocumentListenerSimple(Runnable cb) { this.cb = cb; }
