@@ -9,7 +9,7 @@ import java.util.List;
 
 public class MovementDao {
 
-    /** Inserta un movimiento en el historial. */
+    
     public void insert(String code, String type, int qty, int prevStock, int newStock,
                        String reason, String user, LocalDateTime when) {
         final String sql = """
@@ -19,20 +19,20 @@ public class MovementDao {
         """;
         try (Connection cn = Database.get(); PreparedStatement ps = cn.prepareStatement(sql)) {
             ps.setString(1, code);
-            ps.setString(2, type);               // "ENTRY" | "EXIT" | "ADJUST" | "DELETE"
+            ps.setString(2, type);               
             ps.setInt(3, qty);
             ps.setString(4, reason == null ? "" : reason);
             ps.setInt(5, prevStock);
             ps.setInt(6, newStock);
             ps.setString(7, user);
-            ps.setString(8, when.toString());    // ISO-8601
+            ps.setString(8, when.toString());    
             ps.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();
         }
     }
 
-    /** (Opcional) Inserta usando una conexión existente (para transacciones). */
+    
     public void insert(Connection cn, String code, String type, int qty, int prevStock, int newStock,
                        String reason, String user, LocalDateTime when) throws SQLException {
         final String sql = """
@@ -53,7 +53,7 @@ public class MovementDao {
         }
     }
 
-    /** Lista últimos N movimientos por código (con nombre de producto). */
+    
     public List<String[]> listByCode(String code, int limit) {
         final String sql = """
             SELECT m.type, m.qty, m.reason, m.prev_stock, m.new_stock, m.user, m.created_at,
@@ -88,7 +88,7 @@ public class MovementDao {
         return out;
     }
 
-    /** Lista movimientos recientes (general) con código y nombre de producto. */
+    
     public List<String[]> listRecent(int limit) {
         final String sql = """
             SELECT m.code,
