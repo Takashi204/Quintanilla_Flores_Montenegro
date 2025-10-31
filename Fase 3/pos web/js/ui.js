@@ -1,12 +1,13 @@
-// js/ui.js
+
 import { logout, getUser } from './auth.js';
+
 
 export function mountSidebar(active = 'dashboard'){
   const user = getUser();
   const el = document.getElementById('sidebar');
   if (!el) return;
 
-  // Mantén tu clase .sidebar y añade .sidenav (para estilos nuevos)
+ 
   el.classList.add('sidebar', 'sidenav');
 
   el.innerHTML = `
@@ -19,7 +20,7 @@ export function mountSidebar(active = 'dashboard'){
     <button class="navbtn ${active==='usuarios'?'active':''}" data-href="usuarios.html" type="button">Usuarios</button>
     <button class="navbtn ${active==='ajustes'?'active':''}" data-href="ajustes.html" type="button">Ajustes</button>
     <hr class="navsep">
-    <div class="small" style="margin:6px 8px">Usuario: ${user?.u || '-'} · Rol: ${user?.rol || '-'}</div>
+    <div class="small" style="margin:6px 8px">Usuario: ${user?.u || '-'} · Rol: ${user?.rol || user?.rol || '-'}</div>
     <button id="btnSidebarLogout" class="navbtn" type="button">Cerrar sesión</button>
   `;
 
@@ -31,5 +32,6 @@ export function mountSidebar(active = 'dashboard'){
   const out = document.getElementById('btnSidebarLogout');
   if (out) out.addEventListener('click', logout);
 }
+
 
 

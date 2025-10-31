@@ -1,8 +1,4 @@
 // js/auth.js
-// Manejo simple de sesión (demo) y guardas por rol
-
-// js/auth.js
-// Login por SDK si existe; fallback a localStorage con credenciales demo.
 
 const DEMO_VALID = {
   admin:  { pass: 'admin123',  rol: 'ADMIN'  },
@@ -14,16 +10,27 @@ export function getUser(){
   try{ return JSON.parse(localStorage.getItem('pos_user')||'null'); }
   catch(_){ return null; }
 }
+
 export function logout(){
   localStorage.removeItem('pos_user');
-  location.replace('index.html');
+  // Siempre volver al login
+  location.replace('login.html');
 }
+
+/**
+ * Protege rutas. Si pasas roles, valida pertenencia.
+ * - Si no está logueado -> login.html
+ * - Si está logueado pero NO tiene el rol -> redirige a su home (admin o cajero)
+ */
 export function requireAuth(roles = []){
   const u = getUser();
-  if(!u){ location.replace('index.html'); return null; }
+  if(!u){
+    location.replace('login.html');
+    return null;
+  }
   if(roles.length && !roles.includes(u.rol)){
     if(u.rol === 'ADMIN') location.replace('admin.html');
-    else location.replace('ventas.html');
+    else location.replace('cajero.html');
     return null;
   }
   return u;
@@ -32,27 +39,34 @@ export function requireAuth(roles = []){
 // ─── Login ────────────────────────────────────────────────────────
 export async function doLogin(e){
   e?.preventDefault?.();
-  const user = document.getElementById('user').value.trim();
-  const pass = document.getElementById('pass').value.trim();
+  const user = document.getElementById('user')?.value?.trim() || '';
+  const pass = document.getElementById('pass')?.value?.trim() || '';
   const errorEl = document.getElementById('loginError');
 
-  // Si hay SDK, intenta login real
+  // 1) Intento real via SDK si existe
   if (window.SDK?.Auth?.login) {
     try{
       const res = await window.SDK.Auth.login({ username:user, password:pass });
       // Se espera { username, role, token }
-      if(!res || !res.username){ throw new Error('Respuesta inválida'); }
-      const payload = { u: res.username, rol: res.role || 'ADMIN', token: res.token || null, ts: Date.now() };
+      if(!res || !res.username){
+        throw new Error('Respuesta inválida del SDK');
+      }
+      const payload = {
+        u: res.username,
+        rol: res.role || 'ADMIN',
+        token: res.token || null,
+        ts: Date.now()
+      };
       localStorage.setItem('pos_user', JSON.stringify(payload));
-      location.href = payload.rol === 'ADMIN' ? 'admin.html' : 'ventas.html';
+      location.href = (payload.rol === 'ADMIN') ? 'admin.html' : 'cajero.html';
       return false;
     }catch(err){
-      // Si falla SDK, cae a demo
-      console.warn('SDK.Auth.login falló, usando fallback demo:', err?.message);
+      console.warn('SDK.Auth.login falló, usando DEMO fallback:', err?.message || err);
+      // cae a DEMO
     }
   }
 
-  // Fallback demo local
+  // 2) Fallback demo local (sin backend)
   const rec = DEMO_VALID[user];
   const ok = !!rec && pass === rec.pass;
   if(!ok){
@@ -62,8 +76,9 @@ export async function doLogin(e){
     }
     return false;
   }
+
   const payload = { u: user, rol: rec.rol, token: null, ts: Date.now() };
   localStorage.setItem('pos_user', JSON.stringify(payload));
-  location.href = payload.rol === 'ADMIN' ? 'admin.html' : 'ventas.html';
+  location.href = (payload.rol === 'ADMIN') ? 'admin.html' : 'cajero.html';
   return false;
 }

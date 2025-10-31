@@ -1,4 +1,5 @@
 // js/admin.js — KPIs y paneles del Dashboard
+// Lee directamente del storage (compatible con SDK.mock que escribe pos_sales y pos_products)
 const CLP = v => '$' + Number(v||0).toLocaleString('es-CL');
 
 function loadJSON(key, def){
@@ -26,15 +27,18 @@ function computeKPIs(){
   const monthAgo = new Date(today); monthAgo.setDate(monthAgo.getDate()-30);
 
   const sumIn = (from)=> sales
-    .filter(s => new Date(s.ts) >= from)
-    .reduce((a,s)=> a + Number(s.total||0), 0);
+    .filter(s => {
+      const ts = s.ts ?? (s.date ? new Date(s.date).getTime() : Date.now());
+      return new Date(ts) >= from;
+    })
+    .reduce((a,s)=> a + Number(s.total ?? s.subtotal ?? 0), 0);
 
   document.getElementById('kpiToday').textContent = CLP(sumIn(today));
   document.getElementById('kpiWeek').textContent  = CLP(sumIn(weekAgo));
   document.getElementById('kpiMonth').textContent = CLP(sumIn(monthAgo));
 
   const prods = loadJSON('pos_products', []);
-  document.getElementById('kpiInventory').textContent = prods.length.toString();
+  document.getElementById('kpiInventory').textContent = String(prods.length || 0);
 }
 
 function renderLowStock(){
@@ -85,18 +89,22 @@ function renderExpiring(){
 
 function renderRecentSales(){
   const sales = loadJSON('pos_sales', []);
-  const recent = sales.sort((a,b)=> (b.ts||0)-(a.ts||0)).slice(0, 10);
+  const recent = sales
+    .slice()
+    .sort((a,b)=> (b.ts ?? 0) - (a.ts ?? 0))
+    .slice(0, 10);
 
   const body = document.getElementById('recentBody');
   body.innerHTML = recent.length ? '' : '<tr><td colspan="5" class="text-muted">No hay ventas aún</td></tr>';
   recent.forEach(s=>{
+    const when = s.ts ? new Date(s.ts) : (s.date ? new Date(s.date) : new Date());
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${s.id}</td>
-      <td>${new Date(s.ts).toLocaleString('es-CL')}</td>
+      <td>${when.toLocaleString('es-CL')}</td>
       <td>${s.user||'-'}</td>
       <td>${s.method||'-'}</td>
-      <td class="text-end">${CLP(s.total||0)}</td>
+      <td class="text-end">${CLP(s.total ?? s.subtotal ?? 0)}</td>
     `;
     body.appendChild(tr);
   });
@@ -113,3 +121,4 @@ document.addEventListener('DOMContentLoaded', ()=>{
   refreshAll();
   document.getElementById('btnRefresh')?.addEventListener('click', refreshAll);
 });
+

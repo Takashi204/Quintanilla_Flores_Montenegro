@@ -37,11 +37,15 @@
             <table class="table table-sm mb-0">
               <thead>
                 <tr>
-                  <th>ID</th><th>Nombre</th><th class="text-end">Stock</th>
-                  <th class="text-end">P. Venta</th><th>Vence</th><th>Acciones</th>
+                  <th>ID</th>
+                  <th>Nombre</th>
+                  <th class="text-end">Stock</th>
+                  <th class="text-end">P. Venta</th>
+                  <th>Vence</th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
-              <tbody></tbody> <!-- tu JS llena este tbody -->
+              <tbody></tbody>
             </table>
           </div>
         </div>
@@ -49,46 +53,46 @@
     </main>
   </div>
 
-  <!-- Modal simple -->
-  <div id="modalBackdrop" class="modal-backdrop">
-    <div class="modal">
-      <div class="modal-header">
-        <div class="modal-title" id="modalTitle">Nuevo producto</div>
+  <!-- Modal -->
+  <div id="modalBackdrop" class="pos-modal-backdrop pos-modal-hidden">
+    <div class="pos-modal-card">
+      <div class="modal-header d-flex justify-content-between align-items-center">
+        <div class="modal-title fw-semibold mb-0" id="modalTitle">Nuevo producto</div>
         <button id="modalClose" class="btn btn-sm btn-outline-secondary">Cerrar</button>
       </div>
 
-      <div class="row">
+      <div class="row mt-2">
         <div class="col">
-          <label>Código</label>
+          <label class="form-label">Código</label>
           <input id="f_id" class="form-control" placeholder="P-0001">
         </div>
         <div class="col">
-          <label>Nombre</label>
+          <label class="form-label">Nombre</label>
           <input id="f_nombre" class="form-control">
         </div>
       </div>
 
-      <div class="row">
+      <div class="row mt-2">
         <div class="col">
-          <label>Stock</label>
+          <label class="form-label">Stock</label>
           <input id="f_stock" type="number" min="0" value="0" class="form-control">
         </div>
         <div class="col">
-          <label>Precio venta (CLP)</label>
+          <label class="form-label">Precio venta (CLP)</label>
           <input id="f_precio" type="number" min="0" value="0" class="form-control">
         </div>
       </div>
 
-      <div class="row">
+      <div class="row mt-2">
         <div class="col">
-          <label>Vence (opcional)</label>
+          <label class="form-label">Vence (opcional)</label>
           <input id="f_vence" type="date" class="form-control">
         </div>
       </div>
 
-      <div id="formError" class="alert d-none"></div>
+      <div id="formError" class="alert alert-danger d-none mt-3 small"></div>
 
-      <div class="modal-actions">
+      <div class="modal-actions mt-3 d-flex justify-content-end">
         <button id="btnSave" class="btn btn-primary">Guardar</button>
       </div>
     </div>
@@ -103,4 +107,5 @@
   <script type="module" src="js/inventario.js"></script>
 </body>
 </html>
+
 

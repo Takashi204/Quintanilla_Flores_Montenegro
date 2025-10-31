@@ -24,14 +24,21 @@
     <div class="d-flex justify-content-between"><span>Total</span><strong id="t-total"></strong></div>
     <div class="text-center mt-2 no-print">
       <button class="btn btn-dark btn-sm" onclick="window.print()">Imprimir</button>
-      <a class="btn btn-outline-secondary btn-sm" href="ventas.html">Volver</a>
+      <a id="backBtn" class="btn btn-outline-secondary btn-sm" href="#">Volver</a>
     </div>
   </div>
 
+  <!-- SDK primero -->
+  <script src="assets/sdk.mock.js"></script>
+
   <script type="module">
-    // Lee ID desde query (?id=) o del localStorage pos_last_sale_id
+    // ID desde query (?id=) o desde sessionStorage('pos_last_sale')
     const params = new URLSearchParams(location.search);
-    const qId = params.get('id') || localStorage.getItem('pos_last_sale_id');
+    const qId = params.get('id') || sessionStorage.getItem('pos_last_sale');
+
+    function whoAmI(){
+      try{ return JSON.parse(localStorage.getItem('pos_user')||'null'); }catch{ return null; }
+    }
 
     async function getSale(id){
       if (!id) return null;
@@ -47,13 +54,13 @@
               price: Number(it.price || it.precio || 0),
               qty: Number(it.qty || it.quantity || 1)
             })),
-            subtotal: Number(s.subtotal ?? 0),
+            subtotal: Number(s.subtotal ?? s.sub ?? 0),
             iva: Number(s.iva ?? s.tax ?? 0),
             total: Number(s.total ?? 0)
           };
         }catch(e){ console.warn(e); }
       }
-      // Fallback: buscar en pos_sales
+      // Fallback: buscar en pos_sales (legacy)
       try{
         const all = JSON.parse(localStorage.getItem('pos_sales')||'[]');
         const s = all.find(x => String(x.id) === String(id));
@@ -66,7 +73,7 @@
             price: Number(it.precio || it.price || 0),
             qty: Number(it.qty || 1)
           })),
-          subtotal: Number(s.subtotal || 0),
+          subtotal: Number(s.subtotal || s.sub || 0),
           iva: Number(s.iva || 0),
           total: Number(s.total || 0)
         };
@@ -89,11 +96,19 @@
       document.getElementById('t-total').textContent= '$'+Number(sale.total||0).toLocaleString('es-CL');
     }
 
+    // Configurar botón "Volver" según rol
+    function setupBack(){
+      const back = document.getElementById('backBtn');
+      const u = whoAmI();
+      const href = (u?.rol === 'CAJERO') ? 'cajero.html' : 'ventas.html';
+      back.setAttribute('href', href);
+    }
+
     (async ()=>{
+      setupBack();
       const sale = await getSale(qId);
       render(sale);
     })();
   </script>
 </body>
 </html>
-

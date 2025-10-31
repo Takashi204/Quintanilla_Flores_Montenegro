@@ -54,50 +54,50 @@
     </main>
   </div>
 
-  <!-- Modal simple -->
-  <div id="modalBackdrop" class="modal-backdrop">
-    <div class="modal">
-      <div class="modal-header">
-        <div class="modal-title" id="modalTitle">Nuevo proveedor</div>
+  <!-- Modal unificado -->
+  <div id="modalBackdrop" class="pos-modal-backdrop pos-modal-hidden">
+    <div class="pos-modal-card">
+      <div class="modal-header d-flex justify-content-between align-items-center">
+        <div class="modal-title fw-semibold mb-0" id="modalTitle">Nuevo proveedor</div>
         <button id="modalClose" class="btn btn-sm btn-outline-secondary">Cerrar</button>
       </div>
 
-      <div class="row">
+      <div class="row mt-2">
         <div class="col">
-          <label for="f_id">RUT/ID</label>
+          <label for="f_id" class="form-label">RUT/ID</label>
           <input id="f_id" class="form-control" placeholder="76.123.456-7 / PR-0001">
         </div>
         <div class="col">
-          <label for="f_nombre">Nombre / Razón social</label>
+          <label for="f_nombre" class="form-label">Nombre / Razón social</label>
           <input id="f_nombre" class="form-control">
         </div>
       </div>
 
-      <div class="row">
+      <div class="row mt-2">
         <div class="col">
-          <label for="f_contacto">Contacto</label>
+          <label for="f_contacto" class="form-label">Contacto</label>
           <input id="f_contacto" class="form-control" placeholder="Persona de contacto">
         </div>
         <div class="col">
-          <label for="f_mail">Correo</label>
+          <label for="f_mail" class="form-label">Correo</label>
           <input id="f_mail" type="email" class="form-control" placeholder="contacto@proveedor.cl">
         </div>
       </div>
 
-      <div class="row">
+      <div class="row mt-2">
         <div class="col">
-          <label for="f_tel">Teléfono</label>
+          <label for="f_tel" class="form-label">Teléfono</label>
           <input id="f_tel" class="form-control" placeholder="+56 9 ...">
         </div>
         <div class="col">
-          <label for="f_addr">Dirección</label>
+          <label for="f_addr" class="form-label">Dirección</label>
           <input id="f_addr" class="form-control" placeholder="Calle, comuna">
         </div>
       </div>
 
-      <div id="formError" class="alert d-none"></div>
+      <div id="formError" class="alert alert-danger d-none mt-3 small"></div>
 
-      <div class="modal-actions">
+      <div class="modal-actions mt-3 d-flex justify-content-end">
         <button id="btnSave" class="btn btn-primary">Guardar</button>
       </div>
     </div>
@@ -110,8 +110,10 @@
     const u = requireAuth(['ADMIN']);
     if (u) mountSidebar('proveedores');
   </script>
+
   <!-- Lógica módulo -->
   <script type="module" src="js/proveedores.js"></script>
 </body>
 </html>
+
 
