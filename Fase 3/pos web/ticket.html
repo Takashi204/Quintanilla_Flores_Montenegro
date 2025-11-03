@@ -88,7 +88,7 @@
         }
       }
 
-      // 2) Si falla, buscar en localStorage legacy
+      // 2) Fallback: localStorage legacy
       try{
         const all = JSON.parse(localStorage.getItem('pos_sales')||'[]');
         const s = all.find(x => String(x.id) === String(id));
@@ -100,7 +100,6 @@
     }
 
     function normalizeSale(s){
-      // construye objeto estándar para render
       const tsMs = s.ts
         ? new Date(s.ts).getTime()
         : (s.date ? new Date(s.date).getTime() : Date.now());

@@ -1,10 +1,7 @@
 // js/pos.js
 // POS compartido para ventas.html y cajero.html (usa window.SDK)
-// Versión con flujo de pago en pago.html
-
-// js/pos.js
-// POS compartido para ventas.html y cajero.html (usa window.SDK)
 // Flujo: carrito -> pago.html -> ticket.html
+// + soporte lector de código de barras (escáner USB actúa como teclado)
 
 export function initPOS({ selectors, user }) {
   // Utilidades
@@ -30,7 +27,7 @@ export function initPOS({ selectors, user }) {
   let carrito  = []; // [{id, nombre, precio, qty}]
 
   // =========================
-  //   Carga catálogo
+  //   Cargar catálogo
   // =========================
   async function cargarCatalogo() {
     try {
@@ -49,34 +46,37 @@ export function initPOS({ selectors, user }) {
   }
 
   // =========================
-  //   Render lista productos
+  //   Búsqueda / lista izquierda
   // =========================
   function renderLista(rows) {
     listEl.innerHTML = '';
     if (!rows.length) {
-      listEl.innerHTML = `<div class="text-secondary p-2">Sin resultados…</div>`;
+      listEl.innerHTML = `<div class="text-secondary">Sin resultados…</div>`;
       return;
     }
 
     rows.forEach(p => {
-      const stockNum = Number(p.stock || 0);
+      const stockNum  = Number(p.stock || 0);
       const precioNum = Number(p.precio || p.price || 0);
 
-      const item = document.createElement('div');
-      item.className = 'list-group-item d-flex justify-content-between align-items-center bg-transparent text-light border-secondary';
-      item.innerHTML = `
+      const div = document.createElement('div');
+      div.className = 'product-card d-flex justify-content-between align-items-start';
+
+      div.innerHTML = `
         <div>
-          <strong>${p.nombre || p.name || '(sin nombre)'}</strong>
-          <div class="small text-secondary">${p.id} · Stock ${stockNum}</div>
+          <div class="p-name">${p.nombre || p.name || '(sin nombre)'}</div>
+          <div class="p-meta">${p.id} · Stock ${stockNum}</div>
         </div>
         <div class="text-end">
-          <div class="fw-bold">${CLP(precioNum)}</div>
-          <button class="btn btn-sm btn-info mt-1">Agregar</button>
+          <div class="p-price fw-bold">${CLP(precioNum)}</div>
+          <button class="btn btn-info btn-sm p-add-btn">Agregar</button>
         </div>
       `;
 
-      item.querySelector('button').onclick = () => addItem(p);
-      listEl.appendChild(item);
+      // botón "Agregar"
+      div.querySelector('.p-add-btn').onclick = () => addItem(p);
+
+      listEl.appendChild(div);
     });
   }
 
@@ -88,6 +88,46 @@ export function initPOS({ selectors, user }) {
     );
     renderLista(res);
   }
+
+  // =========================
+  //   LECTOR DE CÓDIGO DE BARRAS
+  // =========================
+  // Idea:
+  // - El lector escribe "001" en qInput y manda Enter.
+  // - Si coincide EXACTO con id del producto -> lo agregamos directo al carrito
+  // - Si no coincide, usamos modo búsqueda normal.
+
+  function intentarScanDirecto() {
+    const code = (qInput.value || '').trim().toLowerCase();
+    if (!code) return;
+
+    // buscar match exacto por ID
+    const prod = catalogo.find(p =>
+      String(p.id || '').toLowerCase() === code
+    );
+
+    if (prod) {
+      // si encontramos el producto, lo metemos al carrito altiro
+      addItem(prod);
+      // limpiar input para el próximo escaneo
+      qInput.value = '';
+      renderLista(catalogo); // volvemos a lista completa
+    } else {
+      // si no hay match directo, hacemos la búsqueda normal
+      filtrar();
+    }
+  }
+
+  // cuando el cajero presiona Enter (o el lector manda Enter)
+  qInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      intentarScanDirecto();
+    }
+  });
+
+  // también filtrar en vivo cuando escribe manualmente
+  qInput.addEventListener('input', filtrar);
 
   // =========================
   //   Carrito
@@ -117,7 +157,6 @@ export function initPOS({ selectors, user }) {
       renderCarrito();
     }
   }
-
   function dec(id) {
     const it = carrito.find(i => i.id === id);
     if (it) {
@@ -128,7 +167,6 @@ export function initPOS({ selectors, user }) {
       renderCarrito();
     }
   }
-
   function delItem(id) {
     carrito = carrito.filter(i => i.id !== id);
     renderCarrito();
@@ -143,24 +181,26 @@ export function initPOS({ selectors, user }) {
 
   function renderCarrito() {
     if (carrito.length === 0) {
-      cartEl.innerHTML = '<div class="text-secondary">Agrega productos…</div>';
+      cartEl.innerHTML = '<div class="text-secondary">Escanea un código o agrega desde la izquierda…</div>';
     } else {
       cartEl.innerHTML = carrito.map(i => `
-        <div class="d-flex justify-content-between align-items-start py-1 border-bottom border-secondary">
-          <div class="me-2 small">
-            <div class="fw-semibold">${i.nombre}</div>
-            <div class="text-secondary">x${i.qty} · ${CLP(i.precio)}</div>
-            <div class="d-flex gap-1 mt-1">
-              <button class="btn btn-sm btn-outline-light" data-act="dec" data-id="${i.id}">-</button>
-              <button class="btn btn-sm btn-outline-light" data-act="inc" data-id="${i.id}">+</button>
-              <button class="btn btn-sm btn-outline-danger" data-act="del" data-id="${i.id}">x</button>
+        <div class="cart-item">
+          <div class="ci-left">
+            <div class="ci-name">${i.nombre}</div>
+            <div class="ci-sub">
+              <span>x${i.qty} · ${CLP(i.precio)}</span>
+              <span class="qty-controls">
+                <button class="btn btn-outline-light btn-sm" data-act="dec" data-id="${i.id}">-</button>
+                <button class="btn btn-outline-light btn-sm" data-act="inc" data-id="${i.id}">+</button>
+                <button class="btn btn-outline-danger btn-sm" data-act="del" data-id="${i.id}">x</button>
+              </span>
             </div>
           </div>
-          <div class="text-end small fw-bold">${CLP(i.precio * i.qty)}</div>
+          <div class="ci-price">${CLP(i.precio * i.qty)}</div>
         </div>
       `).join('');
 
-      // Eventos +/-/x
+      // enganchar botones + - x
       cartEl.querySelectorAll('button').forEach(b => {
         const id  = b.getAttribute('data-id');
         const act = b.getAttribute('data-act');
@@ -189,7 +229,6 @@ export function initPOS({ selectors, user }) {
 
     const { subtotal, iva, total } = calcTotales();
 
-    // Info que necesita la pantalla de pago
     const checkoutPayload = {
       items: carrito.map(i => ({
         id: i.id,
@@ -204,19 +243,12 @@ export function initPOS({ selectors, user }) {
       user: user?.u || 'desconocido'
     };
 
-    // Guardar en sesión
     sessionStorage.setItem('pos_checkout', JSON.stringify(checkoutPayload));
 
-    // Ir a página de pago
     window.location.href = 'pago.html';
   }
 
-  // Eventos
-  qInput.addEventListener('input', filtrar);
-  qInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') filtrar();
-  });
-
+  // botón Cobrar
   chargeBtn.addEventListener('click', cobrar);
 
   // Init

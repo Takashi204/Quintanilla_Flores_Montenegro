@@ -106,7 +106,7 @@ async function confirmarPago() {
     method: metodo,
     cashGiven: entregadoNum,
     change: cambio,
-    items: checkout.items, // [{id,nombre,precio,qty}...]
+    items: checkout.items // [{id,nombre,precio,qty}...]
   };
 
   try {
@@ -144,3 +144,4 @@ btnConfirmar?.addEventListener('click', confirmarPago);
 wireVolver();
 renderResumen();
 recalcVuelto();
+
