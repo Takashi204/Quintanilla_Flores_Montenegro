@@ -1,0 +1,19 @@
+         FERREMAS - MiCaja POS
+           RUT: 77.777.777-7
+       Av. Central 1234, Santiago
+----------------------------------------
+Boleta N°: 10001
+Fecha: 06-11-2025 00:35
+Cajero: cajero
+----------------------------------------
+Producto               Cant     Subtotal
+----------------------------------------
+tuyo                      1         $900
+papa lays                 1       $1.000
+----------------------------------------
+TOTAL:                           $1.900
+----------------------------------------
+        ¡Gracias por su compra!
+            www.ferremas.cl
+
+
