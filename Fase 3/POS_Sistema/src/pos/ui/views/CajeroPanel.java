@@ -1,84 +1,85 @@
-package pos.ui.views;
+package pos.ui.views; // Panel del cajero dentro del paquete de vistas
 
-import pos.dao.InventoryDao;
-import pos.dao.MovementDao;
-import pos.dao.CashSessionDao;
-import pos.model.CashSession;
-import pos.model.Product;
-import pos.model.SaleItem;
-import pos.ui.dialogs.CheckoutDialog;
-import pos.util.DataSync;
-import pos.util.TicketPrinter;
+import pos.dao.InventoryDao; // Acceso a productos (CRUD inventario)
+import pos.dao.MovementDao; // Registro de movimientos (entradas/salidas)
+import pos.dao.CashSessionDao; // Manejo de sesiones de caja
+import pos.model.CashSession; // Modelo de sesión de caja
+import pos.model.Product; // Modelo de producto
+import pos.model.SaleItem; // Modelo de ítem de venta (poco usado en este panel)
+import pos.ui.dialogs.CheckoutDialog; // Modal de cobro
+import pos.util.DataSync; // Eventos de sincronización (actualiza inventario en vivo)
+import pos.util.TicketPrinter; // (no usado aún) impresión de tickets
 
-import javax.swing.*;
-import javax.swing.table.AbstractTableModel;
-import java.awt.*;
-import java.awt.event.*;
-import java.math.BigDecimal;
-import java.text.NumberFormat;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
+import javax.swing.*; // Swing
+import javax.swing.table.AbstractTableModel; // Para los modelos de tabla
+import java.awt.*; // Layouts
+import java.awt.event.*; // Eventos
+import java.math.BigDecimal; // Para enviar totales al CheckoutDialog
+import java.text.NumberFormat; // Formato CLP
+import java.time.LocalDate; // Fecha venta
+import java.time.LocalDateTime; // Fecha para movimientos
+import java.util.ArrayList; // Listas
 import java.util.List;
-import java.util.Locale;
+import java.util.Locale; // Local CL para formato moneda
 
-public class CajeroPanel extends JPanel {
+public class CajeroPanel extends JPanel { // Panel principal del módulo cajero
 
-    private final JTextField txtBuscarCodigo = new JTextField(14);
-    private final JTextField txtBuscarNombre = new JTextField(16);
-    private final JTable tblInv = new JTable(new InvModel());
-    private final ItemsModel itemsModel = new ItemsModel();
-    private final JTable tblCarrito = new JTable(itemsModel);
-    private final JLabel lblTotal = new JLabel("$0");
+    private final JTextField txtBuscarCodigo = new JTextField(14); // Campo buscar por código
+    private final JTextField txtBuscarNombre = new JTextField(16); // Campo buscar por nombre
+    private final JTable tblInv = new JTable(new InvModel()); // Tabla del inventario
+    private final ItemsModel itemsModel = new ItemsModel(); // Modelo para el carrito
+    private final JTable tblCarrito = new JTable(itemsModel); // Tabla del carrito
+    private final JLabel lblTotal = new JLabel("$0"); // Total de la venta
 
-    private final NumberFormat CLP = NumberFormat.getCurrencyInstance(new Locale("es", "CL"));
-    private boolean cajaAbierta = false;
-    private CashSession sesionActual;
+    private final NumberFormat CLP = NumberFormat.getCurrencyInstance(new Locale("es", "CL")); // Formato CLP
+    private boolean cajaAbierta = false; // Estado de la caja
+    private CashSession sesionActual; // Información de la sesión actual
 
-    private final String currentUser;
-    private final InventoryDao inventoryDao = new InventoryDao();
-    private final MovementDao movementDao = new MovementDao();
-    private final CashSessionDao cashDao = new CashSessionDao();
+    private final String currentUser; // Usuario que está usando el POS
+    private final InventoryDao inventoryDao = new InventoryDao(); // DAO inventario
+    private final MovementDao movementDao = new MovementDao(); // DAO movimientos (historial)
+    private final CashSessionDao cashDao = new CashSessionDao(); // DAO sesiones de caja
 
-    public CajeroPanel(String currentUser) {
-        this.currentUser = currentUser;
-        setLayout(new BorderLayout(10, 10));
-        setBackground(new Color(0xF3F4F6));
+    public CajeroPanel(String currentUser) { // Constructor principal
+        this.currentUser = currentUser; // Guarda nombre usuario
 
-        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
-        split.setResizeWeight(0.5);
+        setLayout(new BorderLayout(10, 10)); // Layout general
+        setBackground(new Color(0xF3F4F6)); // Fondo gris moderno
+
+        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT); // Divide inventario | carrito
+        split.setResizeWeight(0.5); // 50% cada lado
         split.setBorder(null);
-        split.setLeftComponent(buildLeft());
-        split.setRightComponent(buildRight());
+        split.setLeftComponent(buildLeft()); // Panel inventario
+        split.setRightComponent(buildRight()); // Panel carrito
         add(split, BorderLayout.CENTER);
 
-        ((InvModel) tblInv.getModel()).reload();
+        ((InvModel) tblInv.getModel()).reload(); // Carga inicial del inventario
 
-        tblInv.addMouseListener(new MouseAdapter() {
+        tblInv.addMouseListener(new MouseAdapter() { // Doble click = agregar carrito
             public void mouseClicked(MouseEvent e) {
                 if (e.getClickCount() == 2 && cajaAbierta) agregarProductoSeleccionado();
             }
         });
 
-        txtBuscarCodigo.addActionListener(e -> {
+        txtBuscarCodigo.addActionListener(e -> { // Enter en código = agregar
             if (cajaAbierta) agregarPorCodigo(txtBuscarCodigo.getText().trim());
         });
 
-        registerShortcuts();
-        verificarSesionAbierta();
+        registerShortcuts(); // Atajos F1 / F2 / F9
+        verificarSesionAbierta(); // Ver si la caja ya estaba abierta previamente
 
         DataSync.addListener("inventory", () -> SwingUtilities.invokeLater(() -> {
-            ((InvModel) tblInv.getModel()).reload();
+            ((InvModel) tblInv.getModel()).reload(); // Refresca inventario cuando cambian cosas
         }));
     }
 
-    private void registerShortcuts() {
-        InputMap im = getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+    private void registerShortcuts() { // Registra teclas rápidas
+        InputMap im = getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW); // Escucha global
         ActionMap am = getActionMap();
 
-        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_F1, 0), "abrirCaja");
-        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_F2, 0), "cerrarCaja");
-        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_F9, 0), "cobrar");
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_F1, 0), "abrirCaja"); // Abrir caja
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_F2, 0), "cerrarCaja"); // Cerrar caja
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_F9, 0), "cobrar"); // Cobrar venta
 
         am.put("abrirCaja", new AbstractAction() {
             public void actionPerformed(ActionEvent e) { abrirCaja(); }
@@ -96,11 +97,11 @@ public class CajeroPanel extends JPanel {
         });
     }
 
-    private JComponent buildLeft() {
+    private JComponent buildLeft() { // Panel izquierdo: inventario
         JPanel p = new JPanel(new BorderLayout(8, 8));
         p.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 4));
 
-        JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
+        JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4)); // Buscadores
         JButton btnBuscar = new JButton("Buscar");
         JButton btnTodos = new JButton("Todos");
 
@@ -110,25 +111,27 @@ public class CajeroPanel extends JPanel {
         top.add(txtBuscarNombre);
         top.add(btnBuscar);
         top.add(btnTodos);
+
         p.add(top, BorderLayout.NORTH);
 
-        tblInv.setRowHeight(24);
+        tblInv.setRowHeight(24); // Estética
         p.add(new JScrollPane(tblInv), BorderLayout.CENTER);
 
-        btnBuscar.addActionListener(e -> ((InvModel) tblInv.getModel()).search(
-                txtBuscarCodigo.getText(), txtBuscarNombre.getText()));
+        btnBuscar.addActionListener(e ->
+                ((InvModel) tblInv.getModel()).search(txtBuscarCodigo.getText(), txtBuscarNombre.getText()));
 
-        btnTodos.addActionListener(e -> ((InvModel) tblInv.getModel()).reload());
+        btnTodos.addActionListener(e ->
+                ((InvModel) tblInv.getModel()).reload());
 
         return p;
     }
 
-    private JComponent buildRight() {
+    private JComponent buildRight() { // Panel derecho: carrito + botones
         JPanel p = new JPanel(new BorderLayout(8, 8));
         p.setBorder(BorderFactory.createEmptyBorder(8, 4, 8, 8));
 
         JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
-        JButton btnNuevo = new JButton("Nuevo");
+        JButton btnNuevo = new JButton("Nuevo"); // Limpia carrito
         JButton btnAbrir = new JButton("Abrir Caja (F1)");
         JButton btnCerrar = new JButton("Cerrar Caja (F2)");
         top.add(btnNuevo);
@@ -136,7 +139,7 @@ public class CajeroPanel extends JPanel {
         top.add(btnCerrar);
         p.add(top, BorderLayout.NORTH);
 
-        tblCarrito.setRowHeight(26);
+        tblCarrito.setRowHeight(26); // Altura de filas
         p.add(new JScrollPane(tblCarrito), BorderLayout.CENTER);
 
         JPanel bottom = new JPanel(new BorderLayout(8, 8));
@@ -146,7 +149,7 @@ public class CajeroPanel extends JPanel {
         tot.add(lblTotal);
 
         JPanel acciones = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-        JButton btnQuitar = new JButton("Quitar ítem");
+        JButton btnQuitar = new JButton("Quitar ítem"); // Eliminar ítem
         JButton btnCobrar = new JButton("Cobrar (F9)");
         acciones.add(btnQuitar);
         acciones.add(btnCobrar);
@@ -164,18 +167,18 @@ public class CajeroPanel extends JPanel {
         return p;
     }
 
-    private void verificarSesionAbierta() {
+    private void verificarSesionAbierta() { // Revisa si la caja estaba abierta
         sesionActual = cashDao.getOpenSession(currentUser);
         cajaAbierta = (sesionActual != null);
     }
 
-    private void abrirCaja() {
+    private void abrirCaja() { // Abre la caja
         if (cajaAbierta) {
             JOptionPane.showMessageDialog(this, "La caja ya está abierta.");
             return;
         }
 
-        cashDao.openSession(currentUser, 0);
+        cashDao.openSession(currentUser, 0); // Abre sesión
         sesionActual = cashDao.getOpenSession(currentUser);
 
         if (sesionActual == null) {
@@ -187,15 +190,15 @@ public class CajeroPanel extends JPanel {
         JOptionPane.showMessageDialog(this, "Caja abierta correctamente.");
     }
 
-    private void cerrarCaja() {
+    private void cerrarCaja() { // Cierra la caja
         if (!cajaAbierta || sesionActual == null) {
             JOptionPane.showMessageDialog(this, "No hay caja abierta.");
             return;
         }
 
-        int totalVentas = cashDao.calcularTotalVentasDelDia(currentUser);
+        int totalVentas = cashDao.calcularTotalVentasDelDia(currentUser); // Suma de ventas
 
-        cashDao.closeSession(currentUser, totalVentas);
+        cashDao.closeSession(currentUser, totalVentas); // Cierra sesión
 
         cajaAbierta = false;
         sesionActual = null;
@@ -203,13 +206,13 @@ public class CajeroPanel extends JPanel {
         JOptionPane.showMessageDialog(this, "Caja cerrada correctamente.");
     }
 
-    private void limpiarCarrito() {
+    private void limpiarCarrito() { // Limpia carrito
         itemsModel.data.clear();
         itemsModel.fireTableDataChanged();
         lblTotal.setText("$0");
     }
 
-    private void quitarItem() {
+    private void quitarItem() { // Quitar ítem
         int r = tblCarrito.getSelectedRow();
         if (r >= 0) {
             itemsModel.data.remove(r);
@@ -218,11 +221,11 @@ public class CajeroPanel extends JPanel {
         }
     }
 
-    private void actualizarTotal() {
+    private void actualizarTotal() { // Recalcula total
         lblTotal.setText(CLP.format(itemsModel.total()));
     }
 
-    private void agregarPorCodigo(String code) {
+    private void agregarPorCodigo(String code) { // Agregar escribiendo código
         if (!cajaAbierta) return;
 
         Product p = inventoryDao.findByCode(code);
@@ -237,7 +240,7 @@ public class CajeroPanel extends JPanel {
         }
     }
 
-    private void agregarProductoSeleccionado() {
+    private void agregarProductoSeleccionado() { // Agregar con doble click
         if (!cajaAbierta) return;
 
         int r = tblInv.getSelectedRow();
@@ -254,8 +257,7 @@ public class CajeroPanel extends JPanel {
         actualizarTotal();
     }
 
-    private void abrirModalCobro() {
-
+    private void abrirModalCobro() { // Abre el CheckoutDialog
         if (!cajaAbierta) {
             JOptionPane.showMessageDialog(this, "Debe abrir la caja.");
             return;
@@ -271,30 +273,28 @@ public class CajeroPanel extends JPanel {
         CheckoutDialog dlg = new CheckoutDialog(
                 SwingUtilities.getWindowAncestor(this),
                 new BigDecimal(total),
-                BigDecimal.ZERO
+                BigDecimal.ZERO // IVA en 0 (no configurado)
         );
 
         dlg.setVisible(true);
         CheckoutDialog.Result r = dlg.getResult();
 
-        if (r == null) return;
+        if (r == null) return; // Cancelado
 
         cobrarVenta(total, r.paymentMethod);
     }
 
-    private void cobrarVenta(int total, String metodoPago) {
-
+    private void cobrarVenta(int total, String metodoPago) { // Graba la venta en BD
         try (var cn = pos.db.Database.get();
              var ps = cn.prepareStatement(
-                     "INSERT INTO sales (code, name, quantity, price, total, fecha, user, metodo) " +
-                             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)")) {
+                     "INSERT INTO sales (code, name, quantity, price, total, fecha, user, metodo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")) {
 
             for (Item it : itemsModel.data) {
 
                 int nuevoStock = it.product.getStock() - it.qty;
-                inventoryDao.updateStock(it.product.getCode(), nuevoStock);
+                inventoryDao.updateStock(it.product.getCode(), nuevoStock); // Actualizar stock
 
-                movementDao.insert(
+                movementDao.insert( // Registrar movimiento
                         it.product.getCode(),
                         "VENTA",
                         it.qty,
@@ -317,7 +317,7 @@ public class CajeroPanel extends JPanel {
                 ps.addBatch();
             }
 
-            ps.executeBatch();
+            ps.executeBatch(); // Ejecuta todas las ventas
 
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage());
@@ -328,14 +328,15 @@ public class CajeroPanel extends JPanel {
         limpiarCarrito();
     }
 
-    // ===================== MODELOS =====================
+    // ------------------- MODELOS DE TABLA -------------------
 
-    private class InvModel extends AbstractTableModel {
+    private class InvModel extends AbstractTableModel { // Inventario
         private final String[] cols = {"Código", "Nombre", "Categoría", "Precio", "Stock"};
         private List<Product> data = new ArrayList<>();
 
         void reload() { data = new ArrayList<>(inventoryDao.listAll()); fireTableDataChanged(); }
-        void search(String c, String n) {
+
+        void search(String c, String n) { // Búsqueda
             List<Product> base = inventoryDao.listAll();
             data.clear();
 
@@ -354,6 +355,7 @@ public class CajeroPanel extends JPanel {
         public int getRowCount() { return data.size(); }
         public int getColumnCount() { return cols.length; }
         public String getColumnName(int c) { return cols[c]; }
+
         public Object getValueAt(int r, int c) {
             Product p = data.get(r);
             return switch (c) {
@@ -367,18 +369,19 @@ public class CajeroPanel extends JPanel {
         }
     }
 
-    private static class Item {
+    private static class Item { // Ítem del carrito
         final Product product; int qty;
         Item(Product p, int q) { product = p; qty = q; }
     }
 
-    private static class ItemsModel extends AbstractTableModel {
+    private static class ItemsModel extends AbstractTableModel { // Modelo del carrito
         private final String[] cols = {"Código", "Nombre", "Precio", "Cantidad", "Subtotal"};
         private final List<Item> data = new ArrayList<>();
 
         public int getRowCount() { return data.size(); }
         public int getColumnCount() { return cols.length; }
         public String getColumnName(int c) { return cols[c]; }
+
         public Object getValueAt(int r, int c) {
             Item it = data.get(r);
             return switch (c) {
@@ -391,9 +394,9 @@ public class CajeroPanel extends JPanel {
             };
         }
 
-        public boolean isCellEditable(int r, int c) { return c == 3; }
+        public boolean isCellEditable(int r, int c) { return c == 3; } // Solo editar cantidad
 
-        public void setValueAt(Object v, int r, int c) {
+        public void setValueAt(Object v, int r, int c) { // Editar cantidad
             if (c == 3) {
                 try {
                     int q = Math.max(1, Integer.parseInt(v.toString().trim()));
@@ -407,7 +410,7 @@ public class CajeroPanel extends JPanel {
             }
         }
 
-        void addOrInc(Product p, int q) {
+        void addOrInc(Product p, int q) { // Añadir o sumar ítem
             for (Item it : data) {
                 if (it.product.getCode().equals(p.getCode())) {
                     if (it.qty + q > p.getStock()) {
@@ -423,7 +426,7 @@ public class CajeroPanel extends JPanel {
             fireTableDataChanged();
         }
 
-        int total() {
+        int total() { // Total del carrito
             int sum = 0;
             for (Item it : data) sum += it.product.getPrice() * it.qty;
             return sum;

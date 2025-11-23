@@ -1,185 +1,163 @@
-package pos.ui.views;
+package pos.ui.views; // Panel de reportes dentro de las vistas UI
 
-import java.awt.*;
-import java.io.FileWriter;
-import java.sql.*;
-import java.text.NumberFormat;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.List;
-import java.util.Locale;
-import java.util.stream.Collectors;
+import java.awt.*; // Layouts y colores
+import java.io.FileWriter; // Para exportar CSV
+import java.sql.*; // Conexión SQL para movimientos de caja
+import java.text.NumberFormat; // Formato moneda CLP
+import java.time.LocalDate; // Fechas (solo día)
+import java.time.LocalDateTime; // Fechas con hora
+import java.time.ZoneId; // Zona horaria para conversión Date -> LocalDate
+import java.time.format.DateTimeFormatter; // Formato de fechas
+import java.util.ArrayList; // Listas dinámicas
+import java.util.Arrays; // Util para exportación CSV
+import java.util.Calendar; // Manipular fechas en Spinner
+import java.util.Date; // Tipo del Spinner
+import java.util.List; // Collections
+import java.util.Locale; // Localización CLP
+import java.util.stream.Collectors; // Filtrado de listas
 
-import javax.swing.*;
-import javax.swing.table.AbstractTableModel;
+import javax.swing.*; // Componentes Swing
+import javax.swing.table.AbstractTableModel; // Modelos de tabla
 
-import pos.dao.VentasDao;
-import pos.model.Sale;
+import pos.dao.VentasDao; // DAO de ventas
+import pos.model.Sale; // Modelo de una venta
 
-public class ReportesPanel extends JPanel {
+public class ReportesPanel extends JPanel { // Panel principal de reportes
 
-    private final JSpinner dpDesde;
-    private final JSpinner dpHasta;
-    private final JLabel lblTotalVendido = new JLabel("$0");
-    private final JLabel lblVentas = new JLabel("0");
-    private final JLabel lblPromedio = new JLabel("$0");
-    private final JLabel lblUltimaVenta = new JLabel("-");
-    private final JTable tblVentas;
-    private final JTable tblMovimientos;
+    private final JSpinner dpDesde; // Selector de fecha "desde"
+    private final JSpinner dpHasta; // Selector de fecha "hasta"
+    private final JLabel lblTotalVendido = new JLabel("$0"); // Métrica total vendido
+    private final JLabel lblVentas = new JLabel("0"); // Cantidad de ventas
+    private final JLabel lblPromedio = new JLabel("$0"); // Ticket promedio
+    private final JLabel lblUltimaVenta = new JLabel("-"); // Fecha última venta
+    private final JTable tblVentas; // Tabla de ventas filtradas
+    private final JTable tblMovimientos; // Tabla de movimientos de caja
 
-    private final NumberFormat CLP = NumberFormat.getCurrencyInstance(new Locale("es", "CL"));
-    private final DateTimeFormatter DF = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm");
+    private final NumberFormat CLP = NumberFormat.getCurrencyInstance(new Locale("es", "CL")); // Formato CLP
+    private final DateTimeFormatter DF = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm"); // Formato fecha completa
 
-    public ReportesPanel() {
-        setLayout(new BorderLayout(12, 12));
-        setBackground(new Color(0xF9FAFB));
+    public ReportesPanel() { // Constructor
+        setLayout(new BorderLayout(12, 12)); // Margen general
+        setBackground(new Color(0xF9FAFB)); // Fondo elegante
 
-        // === Título ===
-        JLabel titulo = new JLabel("Reportes");
-        titulo.setFont(titulo.getFont().deriveFont(Font.BOLD, 18f));
-        titulo.setBorder(BorderFactory.createEmptyBorder(12, 12, 0, 12));
-        add(titulo, BorderLayout.NORTH);
+        JLabel titulo = new JLabel("Reportes"); // Título
+        titulo.setFont(titulo.getFont().deriveFont(Font.BOLD, 18f)); // Estilo grande
+        titulo.setBorder(BorderFactory.createEmptyBorder(12, 12, 0, 12)); // Padding
+        add(titulo, BorderLayout.NORTH); // Arriba
 
-        // === Filtros ===
-        JPanel filtros = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        filtros.setOpaque(false);
+        JPanel filtros = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0)); // Panel filtros
+        filtros.setOpaque(false); // Transparente
 
-        Calendar cal = Calendar.getInstance();
-        cal.add(Calendar.DAY_OF_MONTH, -7);
+        Calendar cal = Calendar.getInstance(); // Fecha actual
+        cal.add(Calendar.DAY_OF_MONTH, -7); // 7 días atrás para fecha inicial
 
-        dpDesde = new JSpinner(new SpinnerDateModel(cal.getTime(), null, null, Calendar.DAY_OF_MONTH));
-        dpHasta = new JSpinner(new SpinnerDateModel(new Date(), null, null, Calendar.DAY_OF_MONTH));
+        dpDesde = new JSpinner(new SpinnerDateModel(cal.getTime(), null, null, Calendar.DAY_OF_MONTH)); // Fecha desde por defecto
+        dpHasta = new JSpinner(new SpinnerDateModel(new Date(), null, null, Calendar.DAY_OF_MONTH)); // Fecha hasta hoy
 
-        dpDesde.setEditor(new JSpinner.DateEditor(dpDesde, "yyyy-MM-dd"));
-        dpHasta.setEditor(new JSpinner.DateEditor(dpHasta, "yyyy-MM-dd"));
+        dpDesde.setEditor(new JSpinner.DateEditor(dpDesde, "yyyy-MM-dd")); // Formato visible
+        dpHasta.setEditor(new JSpinner.DateEditor(dpHasta, "yyyy-MM-dd")); // Formato visible
 
-        JButton btnFiltrar = new JButton("Filtrar");
-        JButton btnActualizar = new JButton("Actualizar");
-        JButton btnExportar = new JButton("Exportar CSV");
+        JButton btnFiltrar = new JButton("Filtrar"); // Botón filtrar rango
+        JButton btnActualizar = new JButton("Actualizar"); // Refrescar
+        JButton btnExportar = new JButton("Exportar CSV"); // Exportar CSV
 
-        filtros.add(new JLabel("Desde:"));
-        filtros.add(dpDesde);
-        filtros.add(new JLabel("Hasta:"));
-        filtros.add(dpHasta);
-        filtros.add(btnFiltrar);
-        filtros.add(btnActualizar);
-        filtros.add(btnExportar);
+        filtros.add(new JLabel("Desde:")); filtros.add(dpDesde); // Agregar inputs
+        filtros.add(new JLabel("Hasta:")); filtros.add(dpHasta);
+        filtros.add(btnFiltrar); filtros.add(btnActualizar); filtros.add(btnExportar);
 
-        // === Métricas ===
-        JPanel metrics = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 8));
+        JPanel metrics = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 8)); // Métricas superiores
         metrics.setOpaque(false);
-        metrics.add(card(lblTotalVendido, "Total vendido"));
-        metrics.add(card(lblVentas, "Ventas"));
-        metrics.add(card(lblPromedio, "Promedio ticket"));
-        metrics.add(card(lblUltimaVenta, "Última venta"));
+        metrics.add(card(lblTotalVendido, "Total vendido")); // Card 1
+        metrics.add(card(lblVentas, "Ventas")); // Card 2
+        metrics.add(card(lblPromedio, "Promedio ticket")); // Card 3
+        metrics.add(card(lblUltimaVenta, "Última venta")); // Card 4
 
-        // === Panel superior combinado ===
-        JPanel topPanel = new JPanel(new BorderLayout());
+        JPanel topPanel = new JPanel(new BorderLayout()); // Panel superior global
         topPanel.setOpaque(false);
-        topPanel.setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
-        topPanel.add(filtros, BorderLayout.NORTH);
-        topPanel.add(metrics, BorderLayout.SOUTH);
-        add(topPanel, BorderLayout.NORTH);
+        topPanel.setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12)); // Margen
+        topPanel.add(filtros, BorderLayout.NORTH); // Filtros arriba
+        topPanel.add(metrics, BorderLayout.SOUTH); // Métricas abajo
+        add(topPanel, BorderLayout.NORTH); // Panel superior
 
-        // === Tablas ===
-        JPanel center = new JPanel(new GridLayout(1, 2, 10, 10));
+        JPanel center = new JPanel(new GridLayout(1, 2, 10, 10)); // Parte central
         center.setOpaque(false);
-        tblVentas = new JTable(new VentasModel());
-        tblMovimientos = new JTable(new MovimientosModel());
 
-        center.add(wrap("Ventas en el rango", new JScrollPane(tblVentas)));
-        center.add(wrap("Movimientos de caja (Aperturas / Cierres)", new JScrollPane(tblMovimientos)));
-        add(center, BorderLayout.CENTER);
+        tblVentas = new JTable(new VentasModel()); // Tabla ventas
+        tblMovimientos = new JTable(new MovimientosModel()); // Tabla movimientos
 
-        // === Acciones ===
-        btnFiltrar.addActionListener(e -> reload());
-        btnActualizar.addActionListener(e -> reload());
-        btnExportar.addActionListener(e -> exportarCSV());
+        center.add(wrap("Ventas en el rango", new JScrollPane(tblVentas))); // Izquierda
+        center.add(wrap("Movimientos de caja (Aperturas / Cierres)", new JScrollPane(tblMovimientos))); // Derecha
+        add(center, BorderLayout.CENTER); // Agregar al panel
 
-        reload();
+        btnFiltrar.addActionListener(e -> reload()); // Filtrar
+        btnActualizar.addActionListener(e -> reload()); // Actualizar
+        btnExportar.addActionListener(e -> exportarCSV()); // Exportar CSV
+
+        reload(); // Carga inicial
     }
 
-    // ------------ UI helpers ------------
+    private JPanel card(JLabel value, String label) { // Card métrica
+        value.setFont(value.getFont().deriveFont(Font.BOLD, 16f)); // Valor grande
+        JLabel cap = new JLabel(label); // Texto pequeño
+        cap.setForeground(new Color(0x6B7280)); // Gris suave
 
-    private JPanel card(JLabel value, String label) {
-        value.setFont(value.getFont().deriveFont(Font.BOLD, 16f));
-
-        JLabel cap = new JLabel(label);
-        cap.setForeground(new Color(0x6B7280));
-
-        JPanel p = new JPanel();
-        p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
-        p.setBackground(Color.WHITE);
+        JPanel p = new JPanel(); // Card contenedor
+        p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS)); // Vertical
+        p.setBackground(Color.WHITE); // Fondo blanco
         p.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(0xE5E7EB)),
-                BorderFactory.createEmptyBorder(8, 14, 8, 14)
+                BorderFactory.createLineBorder(new Color(0xE5E7EB)), // Borde gris
+                BorderFactory.createEmptyBorder(8, 14, 8, 14) // Padding
         ));
-        p.add(value);
-        p.add(cap);
+        p.add(value); // Agrega valor
+        p.add(cap); // Agrega etiqueta
         return p;
     }
 
-    private JPanel wrap(String title, JComponent c) {
+    private JPanel wrap(String title, JComponent c) { // Encabezado de tabla
         JPanel p = new JPanel(new BorderLayout());
         p.setOpaque(false);
-        JLabel t = new JLabel(title);
-        t.setFont(t.getFont().deriveFont(Font.BOLD, 13f));
-        t.setBorder(BorderFactory.createEmptyBorder(0, 0, 6, 0));
-        p.add(t, BorderLayout.NORTH);
-        p.add(c, BorderLayout.CENTER);
+        JLabel t = new JLabel(title); // Título
+        t.setFont(t.getFont().deriveFont(Font.BOLD, 13f)); // Estilo
+        t.setBorder(BorderFactory.createEmptyBorder(0, 0, 6, 0)); // Margin bottom
+        p.add(t, BorderLayout.NORTH); // Arriba
+        p.add(c, BorderLayout.CENTER); // Tabla
         return p;
     }
 
-    // ------------ Lógica principal ------------
-
-    public void reload() {
-        LocalDate desde = toLocalDate((Date) dpDesde.getValue());
+    public void reload() { // Recargar datos según rango
+        LocalDate desde = toLocalDate((Date) dpDesde.getValue()); // Convierte date → LocalDate
         LocalDate hasta = toLocalDate((Date) dpHasta.getValue());
 
-        // Ventas desde VentasDao
-        List<Sale> ventas = VentasDao.listAll();
+        List<Sale> ventas = VentasDao.listAll(); // Todas las ventas
 
-        List<Sale> filtradas = ventas.stream()
+        List<Sale> filtradas = ventas.stream() // Filtrar rango
                 .filter(v -> {
-                    LocalDate d = v.getTs().toLocalDate();
+                    LocalDate d = v.getTs().toLocalDate(); // Fecha venta
                     return (d.isEqual(desde) || d.isAfter(desde)) &&
                            (d.isEqual(hasta) || d.isBefore(hasta));
                 })
-                .collect(Collectors.toList());   // <- compatible con Java 8
+                .collect(Collectors.toList()); // Compatible con Java 8
 
-        int total = filtradas.stream().mapToInt(Sale::getTotal).sum();
-        int cantidad = filtradas.size();
-        int promedio = (cantidad > 0) ? total / cantidad : 0;
+        int total = filtradas.stream().mapToInt(Sale::getTotal).sum(); // Total ventas
+        int cantidad = filtradas.size(); // Número de ventas
+        int promedio = (cantidad > 0) ? total / cantidad : 0; // Ticket promedio
 
-        lblTotalVendido.setText(CLP.format(total));
-        lblVentas.setText(String.valueOf(cantidad));
-        lblPromedio.setText(CLP.format(promedio));
+        lblTotalVendido.setText(CLP.format(total)); // Mostrar total
+        lblVentas.setText(String.valueOf(cantidad)); // Mostrar cantidad
+        lblPromedio.setText(CLP.format(promedio)); // Mostrar ticket promedio
         lblUltimaVenta.setText(filtradas.isEmpty()
                 ? "-"
-                : DF.format(filtradas.get(0).getTs()));
+                : DF.format(filtradas.get(0).getTs())); // Última venta
 
-        ((VentasModel) tblVentas.getModel()).setData(filtradas);
-        ((MovimientosModel) tblMovimientos.getModel()).setData(listarMovimientos(desde, hasta));
+        ((VentasModel) tblVentas.getModel()).setData(filtradas); // Recargar tabla ventas
+        ((MovimientosModel) tblMovimientos.getModel()).setData(listarMovimientos(desde, hasta)); // Recargar caja
     }
 
-    private static LocalDate toLocalDate(Date d) {
+    private static LocalDate toLocalDate(Date d) { // Convertir Date → LocalDate
         return d.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
     }
 
-    // ------------ MOVIMIENTOS DE CAJA (FIX) ------------
-
-    /**
-     * Por cada fila de cash_sessions se generan:
-     *  - 1 fila "Apertura" (open_time, monto_inicial)
-     *  - 1 fila "Cierre"  (close_time, monto_final) SOLO si closed = 1
-     */
-    private List<Object[]> listarMovimientos(LocalDate desde, LocalDate hasta) {
+    private List<Object[]> listarMovimientos(LocalDate desde, LocalDate hasta) { // Movimientos caja
         List<Object[]> data = new ArrayList<>();
 
         try (Connection cn = pos.db.Database.get();
@@ -204,14 +182,12 @@ public class ReportesPanel extends JPanel {
                 LocalDateTime openTime = LocalDateTime.parse(openStr);
                 int montoInicial = rs.getInt("monto_inicial");
 
-                // Siempre agregamos una fila de APERTURA
                 data.add(new Object[]{
                         "Apertura",
                         DF.format(openTime),
                         CLP.format(montoInicial)
                 });
 
-                // Si está cerrada, agregamos también la fila de CIERRE
                 int closed = rs.getInt("closed");
                 String closeStr = rs.getString("close_time");
                 if (closed == 1 && closeStr != null) {
@@ -233,21 +209,19 @@ public class ReportesPanel extends JPanel {
         return data;
     }
 
-    // ------------ Exportar CSV ------------
-
-    private void exportarCSV() {
+    private void exportarCSV() { // Exportar CSV
         try {
             JFileChooser fc = new JFileChooser();
             if (fc.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
                 try (FileWriter fw = new FileWriter(fc.getSelectedFile() + ".csv")) {
 
-                    fw.write("Tipo,Hora,Monto\n");
+                    fw.write("Tipo,Hora,Monto\n"); // Encabezado
 
                     for (Object[] row : ((MovimientosModel) tblMovimientos.getModel()).getData()) {
                         fw.write(String.join(",",
                                 Arrays.stream(row)
-                                        .map(Object::toString)
-                                        .toArray(String[]::new)));
+                                      .map(Object::toString)
+                                      .toArray(String[]::new)));
                         fw.write("\n");
                     }
                 }
@@ -259,13 +233,11 @@ public class ReportesPanel extends JPanel {
         }
     }
 
-    // ------------ Modelos de tabla ------------
-
-    private static class VentasModel extends AbstractTableModel {
-        private final String[] cols = {"ID", "Documento", "Método", "Total"};
+    private static class VentasModel extends AbstractTableModel { // Modelo tabla ventas
+        private final String[] cols = {"ID", "Documento", "Método", "Total"}; // Encabezados
         private List<Sale> data = new ArrayList<>();
 
-        public void setData(List<Sale> rows) {
+        public void setData(List<Sale> rows) { // Cargar filas
             data = rows;
             fireTableDataChanged();
         }
@@ -275,7 +247,7 @@ public class ReportesPanel extends JPanel {
         @Override public String getColumnName(int c) { return cols[c]; }
 
         @Override
-        public Object getValueAt(int r, int c) {
+        public Object getValueAt(int r, int c) { // Datos por columna
             Sale s = data.get(r);
             switch (c) {
                 case 0: return s.getId();
@@ -290,25 +262,23 @@ public class ReportesPanel extends JPanel {
         }
     }
 
-    private static class MovimientosModel extends AbstractTableModel {
+    private static class MovimientosModel extends AbstractTableModel { // Modelo caja
         private final String[] cols = {"Tipo", "Hora", "Monto"};
         private List<Object[]> data = new ArrayList<>();
 
-        public void setData(List<Object[]> rows) {
+        public void setData(List<Object[]> rows) { // Cargar filas
             data = rows;
             fireTableDataChanged();
         }
 
-        public List<Object[]> getData() {
-            return data;
-        }
+        public List<Object[]> getData() { return data; } // Usado para exportar
 
         @Override public int getRowCount() { return data.size(); }
         @Override public int getColumnCount() { return cols.length; }
         @Override public String getColumnName(int c) { return cols[c]; }
 
         @Override
-        public Object getValueAt(int r, int c) {
+        public Object getValueAt(int r, int c) { // Mostrar celda
             return data.get(r)[c];
         }
     }

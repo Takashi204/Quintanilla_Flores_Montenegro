@@ -1,58 +1,62 @@
-package pos.util;
+package pos.util; // Paquete de utilidades del sistema
 
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.*; // List, Map, etc.
+import java.util.concurrent.*; // ConcurrentHashMap y CopyOnWriteArrayList
 
 /**
- * 🔄 Clase DataSync
- * Sistema simple de sincronización global entre paneles (como CajeroPanel, InventarioPanel, etc.)
- * Permite que todos los módulos escuchen cambios de tablas específicas (ej: "inventory").
+ * 🔄 Clase DataSync — sistema global de sincronización.
+ * Permite que varios paneles (inventario, ventas, admin) reaccionen
+ * automáticamente cuando otro módulo cambia datos en BD.
  */
 public class DataSync {
 
-    // Mapa de listeners por categoría (por ejemplo: "inventory", "sales", etc.)
-    private static final Map<String, List<Runnable>> listeners = new ConcurrentHashMap<>();
+    // Mapa donde cada categoría tiene una lista de listeners → ej: "inventory" → listeners
+    private static final Map<String, List<Runnable>> listeners = new ConcurrentHashMap<>(); // Thread-safe
 
     /**
-     * Registra un listener que se ejecutará cuando haya un cambio en la categoría indicada.
-     * @param category Nombre de la categoría (ej: "inventory")
-     * @param listener Código a ejecutar cuando se notifique un cambio
+     * Agrega un listener que se ejecuta cuando ocurre un cambio.
+     * @param category categoría ej: "inventory", "sales", "products"
+     * @param listener código a ejecutar (Runnable)
      */
     public static void addListener(String category, Runnable listener) {
-        listeners.computeIfAbsent(category, k -> new CopyOnWriteArrayList<>()).add(listener);
+        listeners                          // Mapa global de categorías
+            .computeIfAbsent(category, k -> new CopyOnWriteArrayList<>()) // Si no existe, crea lista segura
+            .add(listener); // Agregar listener para esta categoría
     }
 
     /**
-     * Elimina un listener registrado (opcional).
-     * @param category Categoría asociada
-     * @param listener Listener a eliminar
+     * Quita un listener registrado.
+     * @param category categoría asociada al listener
+     * @param listener acción a eliminar
      */
     public static void removeListener(String category, Runnable listener) {
-        List<Runnable> list = listeners.get(category);
-        if (list != null) list.remove(listener);
+        List<Runnable> list = listeners.get(category); // Obtiene lista de la categoría
+        if (list != null) list.remove(listener); // Si existe, lo elimina
     }
 
     /**
-     * Notifica a todos los paneles suscritos que hubo un cambio en la categoría.
-     * @param category Categoría afectada
+     * Ejecuta TODOS los listeners asociados a una categoría.
+     * Esto es lo que provoca que los paneles refresquen su información.
      */
     public static void notifyChange(String category) {
-        List<Runnable> list = listeners.get(category);
+        List<Runnable> list = listeners.get(category); // Lista de listeners de la categoría
         if (list != null) {
-            for (Runnable r : list) {
+            for (Runnable r : list) { // Recorre todos los listeners
                 try {
-                    r.run();
+                    r.run(); // Ejecuta callback
                 } catch (Exception e) {
-                    System.err.println("[DataSync] Error al ejecutar listener de " + category + ": " + e.getMessage());
+                    System.err.println("[DataSync] Error al ejecutar listener de "
+                            + category + ": " + e.getMessage()); // Evita que un error rompa todo
                 }
             }
         }
     }
 
     /**
-     * Limpia todos los listeners (útil al cerrar sesión o reiniciar la app).
+     * Borra todas las suscripciones de toda la app.
+     * Útil al cerrar sesión o recargar el sistema.
      */
     public static void clearAll() {
-        listeners.clear();
+        listeners.clear(); // Limpia el mapa entero
     }
 }

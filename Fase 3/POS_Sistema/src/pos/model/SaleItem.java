@@ -1,39 +1,57 @@
-package pos.model;
+package pos.model; // el modelo SaleItem vive en este paquete
 
-import java.util.Objects;
+import java.util.Objects; // usado para equals/hashCode
 
 public class SaleItem {
 
-    private Product product;
-    private int quantity;
+    // ================================
+    // Atributos del ítem de venta
+    // ================================
 
+    private Product product; // producto involucrado en la venta
+    private int quantity;    // cantidad vendida de este producto
+
+    // ================================
+    // Constructor
+    // ================================
     public SaleItem(Product product, int quantity) {
-        this.product = product;
-        this.quantity = Math.max(1, quantity);
+        this.product = product;              // asignar producto
+        this.quantity = Math.max(1, quantity); // evita cantidades 0 o negativas
     }
 
     // ================================
-    //            GETTERS
+    // GETTERS
     // ================================
-    public Product getProduct() { return product; }
-    public int getQty() { return quantity; }
-    public int getQuantity() { return quantity; }
+    public Product getProduct() { return product; }  // devuelve producto
+    public int getQty() { return quantity; }         // alias de cantidad
+    public int getQuantity() { return quantity; }    // cantidad vendida
 
     // ================================
-    //            SETTERS
+    // SETTERS
     // ================================
-    public void setProduct(Product product) { this.product = product; }
-    public void setQuantity(int quantity) { this.quantity = Math.max(1, quantity); }
+    public void setProduct(Product product) { 
+        this.product = product; 
+    }
+
+    public void setQuantity(int quantity) { 
+        // evita poner cantidad 0 o negativa → siempre al menos 1
+        this.quantity = Math.max(1, quantity); 
+    }
 
     // ================================
-    //            LÓGICA
+    // LÓGICA DE NEGOCIO
     // ================================
-    /** Subtotal = price * qty (null-safe). */
+    /** 
+     * Calcula el subtotal del ítem:
+     * subtotal = precio del producto * cantidad
+     * Maneja caso null por seguridad.
+     */
     public int getSubtotal() {
         int price = (product == null) ? 0 : Math.max(0, product.getPrice());
         return price * Math.max(1, quantity);
     }
 
+    // Representación en texto útil para depuración o impresión
     @Override
     public String toString() {
         String name = (product == null) ? "(producto)" : product.getName();
@@ -41,23 +59,26 @@ public class SaleItem {
     }
 
     // ================================
-    //            EQUALITY
+    // EQUALITY — compara ítems por producto y cantidad
     // ================================
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
+        if (this == o) return true;              // si es el mismo objeto → true
         if (!(o instanceof SaleItem)) return false;
 
         SaleItem that = (SaleItem) o;
+
+        // Comparación segura del código del producto (product puede ser null)
         String codeA = (product == null) ? null : product.getCode();
         String codeB = (that.product == null) ? null : that.product.getCode();
 
+        // Igual si tienen el mismo producto y misma cantidad
         return quantity == that.quantity && Objects.equals(codeA, codeB);
     }
 
     @Override
     public int hashCode() {
         String code = (product == null) ? null : product.getCode();
-        return Objects.hash(code, quantity);
+        return Objects.hash(code, quantity); // usa código + cantidad como identidad
     }
 }

@@ -1,171 +1,155 @@
-package pos.ui.views;
+package pos.ui.views; // Panel de la vista Proveedores dentro del módulo UI
 
-import pos.dao.ProviderDao;
-import pos.model.Provider;
+import pos.dao.ProviderDao; // DAO para CRUD real en BD de proveedores
+import pos.model.Provider; // Modelo Provider (id, name, phone, email, etc.)
 
-import javax.swing.*;
-import javax.swing.table.AbstractTableModel;
-import java.awt.*;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.List;
+import javax.swing.*; // Componentes Swing
+import javax.swing.table.AbstractTableModel; // Modelo para tabla
+import java.awt.*; // Layouts
+import java.time.LocalDate; // Fechas de creación
+import java.time.format.DateTimeFormatter; // Formato DD-MM-YYYY
+import java.util.List; // Listas
 
-public class ProveedoresPanel extends JPanel {
+public class ProveedoresPanel extends JPanel { // Panel principal de proveedores
 
-    private static final DateTimeFormatter DF = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+    private static final DateTimeFormatter DF = DateTimeFormatter.ofPattern("dd-MM-yyyy"); // Formato de fecha
 
-    private final ProviderDao dao = new ProviderDao(); // ✅ DAO para BD real
-    private final JTextField txtBuscar = new JTextField(22);
-    private final JTable tabla = new JTable(new ProveedoresModel());
-    private final ProveedoresModel modelo = (ProveedoresModel) tabla.getModel();
+    private final ProviderDao dao = new ProviderDao(); // DAO que maneja BD de proveedores
+    private final JTextField txtBuscar = new JTextField(22); // Input búsqueda
+    private final JTable tabla = new JTable(new ProveedoresModel()); // Tabla visual
+    private final ProveedoresModel modelo = (ProveedoresModel) tabla.getModel(); // Modelo de tabla
 
-    public ProveedoresPanel() {
-        setLayout(new BorderLayout(10, 10));
-        setBackground(new Color(0xF9FAFB));
+    public ProveedoresPanel() { // Constructor del panel
+        setLayout(new BorderLayout(10, 10)); // Margen general
+        setBackground(new Color(0xF9FAFB)); // Fondo gris claro elegante
 
-        // ===== Título =====
-        JLabel title = new JLabel("Proveedores");
-        title.setFont(title.getFont().deriveFont(Font.BOLD, 18f));
-        title.setBorder(BorderFactory.createEmptyBorder(12, 12, 0, 12));
-        add(title, BorderLayout.NORTH);
+        JLabel title = new JLabel("Proveedores"); // Título
+        title.setFont(title.getFont().deriveFont(Font.BOLD, 18f)); // Tamaño grande
+        title.setBorder(BorderFactory.createEmptyBorder(12, 12, 0, 12)); // Padding
+        add(title, BorderLayout.NORTH); // Arriba
 
-        // ===== Barra superior =====
-        JPanel barra = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 8));
-        barra.setOpaque(false);
+        JPanel barra = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 8)); // Barra superior
+        barra.setOpaque(false); // Transparente
 
-        txtBuscar.putClientProperty("JTextField.placeholderText", "Buscar por nombre, teléfono, email o ID...");
-        JButton btnBuscar = new JButton("Buscar");
-        JButton btnNuevo = new JButton("Nuevo");
-        JButton btnEditar = new JButton("Editar");
-        JButton btnEliminar = new JButton("Eliminar");
-        JButton btnRapido = new JButton("Registro rápido");
+        txtBuscar.putClientProperty("JTextField.placeholderText",
+                "Buscar por nombre, teléfono, email o ID..."); // Placeholder del buscador
+        
+        JButton btnBuscar = new JButton("Buscar"); // Botón buscar
+        JButton btnNuevo = new JButton("Nuevo"); // Crear proveedor
+        JButton btnEditar = new JButton("Editar"); // Editar proveedor
+        JButton btnEliminar = new JButton("Eliminar"); // Eliminar proveedor
+        JButton btnRapido = new JButton("Registro rápido"); // Alta rápida
 
-        barra.add(txtBuscar);
-        barra.add(btnBuscar);
-        barra.add(btnNuevo);
-        barra.add(btnEditar);
-        barra.add(btnEliminar);
-        barra.add(btnRapido);
-        add(barra, BorderLayout.PAGE_START);
+        barra.add(txtBuscar); // Input búsqueda
+        barra.add(btnBuscar); // Botón buscar
+        barra.add(btnNuevo); // Crear nuevo
+        barra.add(btnEditar); // Editar
+        barra.add(btnEliminar); // Eliminar
+        barra.add(btnRapido); // Registro rápido
+        add(barra, BorderLayout.PAGE_START); // Arriba
 
-        // ===== Tabla =====
-        tabla.setRowHeight(22);
-        add(new JScrollPane(tabla), BorderLayout.CENTER);
+        tabla.setRowHeight(22); // Alto de filas
+        add(new JScrollPane(tabla), BorderLayout.CENTER); // Scroll + tabla
 
-        // Carga inicial
-        recargar();
+        recargar(); // Cargar datos al abrir panel
 
-        // Acciones
-        btnBuscar.addActionListener(e -> buscar());
-        btnNuevo.addActionListener(e -> nuevoProveedor());
-        btnEditar.addActionListener(e -> editarProveedor());
-        btnEliminar.addActionListener(e -> eliminarProveedor());
-        btnRapido.addActionListener(e -> registroRapido());
+        btnBuscar.addActionListener(e -> buscar()); // Listener buscar
+        btnNuevo.addActionListener(e -> nuevoProveedor()); // Listener nuevo
+        btnEditar.addActionListener(e -> editarProveedor()); // Listener editar
+        btnEliminar.addActionListener(e -> eliminarProveedor()); // Listener eliminar
+        btnRapido.addActionListener(e -> registroRapido()); // Listener registro rápido
     }
 
-    // ===== Lógica =====
-    private void recargar() {
-        modelo.set(dao.listAll());
+    private void recargar() { // Recargar lista desde BD
+        modelo.set(dao.listAll()); // Actualizar modelo
     }
 
-    private void buscar() {
-        String q = txtBuscar.getText().trim().toLowerCase();
-        if (q.isEmpty()) {
-            recargar();
-            return;
-        }
+    private void buscar() { // Lógica de búsqueda
+        String q = txtBuscar.getText().trim().toLowerCase(); // Texto buscado
+        if (q.isEmpty()) { recargar(); return; } // Si vacío, cargar todo
 
-        List<Provider> todos = dao.listAll();
-        List<Provider> filtrados = todos.stream()
+        List<Provider> todos = dao.listAll(); // Lista completa
+        List<Provider> filtrados = todos.stream() // Filtrar por:
                 .filter(p ->
-                        p.getName().toLowerCase().contains(q)
-                                || (p.getPhone() != null && p.getPhone().toLowerCase().contains(q))
-                                || (p.getEmail() != null && p.getEmail().toLowerCase().contains(q))
-                                || p.getId().toLowerCase().contains(q))
+                        p.getName().toLowerCase().contains(q) // Nombre
+                                || (p.getPhone() != null && p.getPhone().toLowerCase().contains(q)) // Teléfono
+                                || (p.getEmail() != null && p.getEmail().toLowerCase().contains(q)) // Email
+                                || p.getId().toLowerCase().contains(q)) // ID
                 .toList();
 
-        modelo.set(filtrados);
+        modelo.set(filtrados); // Actualizar tabla
     }
 
-    private void nuevoProveedor() {
-        JTextField id = new JTextField(dao.nextId());
-        JTextField nombre = new JTextField();
-        JTextField fono = new JTextField();
-        JTextField email = new JTextField();
-        JTextField direccion = new JTextField();
-        JTextField fecha = new JTextField(LocalDate.now().toString());
+    private void nuevoProveedor() { // Crear proveedor
+        JTextField id = new JTextField(dao.nextId()); // ID sugerido
+        JTextField nombre = new JTextField(); // Input nombre
+        JTextField fono = new JTextField(); // Input fono
+        JTextField email = new JTextField(); // Input email
+        JTextField direccion = new JTextField(); // Input dirección
+        JTextField fecha = new JTextField(LocalDate.now().toString()); // Fecha creación por defecto
 
-        JPanel p = new JPanel(new GridLayout(0, 2, 6, 6));
-        p.add(new JLabel("ID:"));
-        p.add(id);
-        p.add(new JLabel("Nombre:"));
-        p.add(nombre);
-        p.add(new JLabel("Teléfono:"));
-        p.add(fono);
-        p.add(new JLabel("Email:"));
-        p.add(email);
-        p.add(new JLabel("Dirección:"));
-        p.add(direccion);
-        p.add(new JLabel("Creado (AAAA-MM-DD):"));
-        p.add(fecha);
+        JPanel p = new JPanel(new GridLayout(0, 2, 6, 6)); // Formulario
+        p.add(new JLabel("ID:")); p.add(id);
+        p.add(new JLabel("Nombre:")); p.add(nombre);
+        p.add(new JLabel("Teléfono:")); p.add(fono);
+        p.add(new JLabel("Email:")); p.add(email);
+        p.add(new JLabel("Dirección:")); p.add(direccion);
+        p.add(new JLabel("Creado (AAAA-MM-DD):")); p.add(fecha);
 
-        int res = JOptionPane.showConfirmDialog(this, p, "Nuevo proveedor", JOptionPane.OK_CANCEL_OPTION);
-        if (res == JOptionPane.OK_OPTION) {
+        int res = JOptionPane.showConfirmDialog(this, p, "Nuevo proveedor",
+                JOptionPane.OK_CANCEL_OPTION); // Mostrar diálogo
+        if (res == JOptionPane.OK_OPTION) { // Si presiona OK
             try {
-                LocalDate created = fecha.getText().isBlank() ? LocalDate.now() : LocalDate.parse(fecha.getText());
+                LocalDate created = fecha.getText().isBlank()
+                        ? LocalDate.now()
+                        : LocalDate.parse(fecha.getText()); // Parse fecha
+
                 Provider prov = new Provider(
-                        id.getText(),
-                        nombre.getText(),
-                        fono.getText(),
-                        email.getText(),
-                        direccion.getText(),
-                        created
+                        id.getText(), nombre.getText(), fono.getText(),
+                        email.getText(), direccion.getText(), created
                 );
-                dao.insert(prov);
-                recargar();
+                dao.insert(prov); // Guardar en BD
+                recargar(); // Refrescar tabla
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "Datos inválidos");
+                JOptionPane.showMessageDialog(this, "Datos inválidos"); // Error datos
             }
         }
     }
 
-    private void editarProveedor() {
-        int row = tabla.getSelectedRow();
-        if (row < 0) {
+    private void editarProveedor() { // Editar proveedor
+        int row = tabla.getSelectedRow(); // Fila seleccionada
+        if (row < 0) { // Si no seleccionó
             JOptionPane.showMessageDialog(this, "Selecciona un proveedor para editar");
             return;
         }
-        Provider p = modelo.getAt(row);
+        Provider p = modelo.getAt(row); // Obtener proveedor
 
-        JTextField nombre = new JTextField(p.getName());
+        JTextField nombre = new JTextField(p.getName()); // Campos con datos actuales
         JTextField fono = new JTextField(p.getPhone());
         JTextField email = new JTextField(p.getEmail());
         JTextField direccion = new JTextField(p.getAddress());
         JTextField fecha = new JTextField(p.getCreatedAt() == null ? "" : p.getCreatedAt().toString());
 
-        JPanel panel = new JPanel(new GridLayout(0, 2, 6, 6));
-        panel.add(new JLabel("ID:"));
-        panel.add(new JLabel(p.getId()));
-        panel.add(new JLabel("Nombre:"));
-        panel.add(nombre);
-        panel.add(new JLabel("Teléfono:"));
-        panel.add(fono);
-        panel.add(new JLabel("Email:"));
-        panel.add(email);
-        panel.add(new JLabel("Dirección:"));
-        panel.add(direccion);
-        panel.add(new JLabel("Creado:"));
-        panel.add(fecha);
+        JPanel panel = new JPanel(new GridLayout(0, 2, 6, 6)); // Formulario editar
+        panel.add(new JLabel("ID:")); panel.add(new JLabel(p.getId())); // ID no editable
+        panel.add(new JLabel("Nombre:")); panel.add(nombre);
+        panel.add(new JLabel("Teléfono:")); panel.add(fono);
+        panel.add(new JLabel("Email:")); panel.add(email);
+        panel.add(new JLabel("Dirección:")); panel.add(direccion);
+        panel.add(new JLabel("Creado:")); panel.add(fecha);
 
-        int res = JOptionPane.showConfirmDialog(this, panel, "Editar proveedor", JOptionPane.OK_CANCEL_OPTION);
-        if (res == JOptionPane.OK_OPTION) {
+        int res = JOptionPane.showConfirmDialog(this, panel, "Editar proveedor",
+                JOptionPane.OK_CANCEL_OPTION);
+        if (res == JOptionPane.OK_OPTION) { // Guardar cambios
             try {
                 p.setName(nombre.getText());
                 p.setPhone(fono.getText());
                 p.setEmail(email.getText());
                 p.setAddress(direccion.getText());
-                p.setCreatedAt(fecha.getText().isBlank() ? null : LocalDate.parse(fecha.getText()));
-                dao.update(p);
+                p.setCreatedAt(fecha.getText().isBlank()
+                        ? null
+                        : LocalDate.parse(fecha.getText()));
+                dao.update(p); // Actualizar en BD
                 recargar();
             } catch (Exception ex) {
                 JOptionPane.showMessageDialog(this, "Error al editar proveedor");
@@ -173,78 +157,67 @@ public class ProveedoresPanel extends JPanel {
         }
     }
 
-    private void eliminarProveedor() {
-        int row = tabla.getSelectedRow();
+    private void eliminarProveedor() { // Eliminar proveedor
+        int row = tabla.getSelectedRow(); // Fila seleccionada
         if (row < 0) {
             JOptionPane.showMessageDialog(this, "Selecciona un proveedor para eliminar");
             return;
         }
-        Provider p = modelo.getAt(row);
-        int ok = JOptionPane.showConfirmDialog(this, "¿Eliminar " + p.getName() + "?", "Confirmar", JOptionPane.YES_NO_OPTION);
-        if (ok == JOptionPane.YES_OPTION) {
-            dao.delete(p.getId());
-            recargar();
+        Provider p = modelo.getAt(row); // Proveedor
+
+        int ok = JOptionPane.showConfirmDialog(this,
+                "¿Eliminar " + p.getName() + "?", "Confirmar",
+                JOptionPane.YES_NO_OPTION); // Confirmar eliminación
+
+        if (ok == JOptionPane.YES_OPTION) { // Si confirma
+            dao.delete(p.getId()); // Eliminar de BD
+            recargar(); // Refrescar
         }
     }
 
-    private void registroRapido() {
-        JTextField nombre = new JTextField();
-        JTextField fono = new JTextField();
+    private void registroRapido() { // Crear proveedor minimalista
+        JTextField nombre = new JTextField(); // Solo nombre
+        JTextField fono = new JTextField(); // Solo teléfono
 
-        JPanel p = new JPanel(new GridLayout(0, 2, 6, 6));
-        p.add(new JLabel("Nombre:"));
-        p.add(nombre);
-        p.add(new JLabel("Teléfono:"));
-        p.add(fono);
+        JPanel p = new JPanel(new GridLayout(0, 2, 6, 6)); // Formulario rápido
+        p.add(new JLabel("Nombre:")); p.add(nombre);
+        p.add(new JLabel("Teléfono:")); p.add(fono);
 
-        int res = JOptionPane.showConfirmDialog(this, p, "Registro rápido de proveedor", JOptionPane.OK_CANCEL_OPTION);
+        int res = JOptionPane.showConfirmDialog(this, p, "Registro rápido de proveedor",
+                JOptionPane.OK_CANCEL_OPTION);
+
         if (res == JOptionPane.OK_OPTION) {
             try {
                 Provider prov = new Provider(
-                        dao.nextId(),
-                        nombre.getText(),
-                        fono.getText(),
+                        dao.nextId(), nombre.getText(), fono.getText(),
                         "", "", LocalDate.now()
-                );
-                dao.insert(prov);
-                recargar();
+                ); // Email/dirección vacíos
+                dao.insert(prov); // Insertar BD
+                recargar(); // Refrescar
             } catch (Exception ex) {
                 JOptionPane.showMessageDialog(this, "Error en los datos ingresados");
             }
         }
     }
 
-    // ===== Modelo de tabla =====
-    private static class ProveedoresModel extends AbstractTableModel {
-        private final String[] cols = {"ID", "Nombre", "Teléfono", "Email", "Dirección", "Creado"};
-        private List<Provider> data = List.of();
+    private static class ProveedoresModel extends AbstractTableModel { // Modelo tabla
+        private final String[] cols =
+                {"ID", "Nombre", "Teléfono", "Email", "Dirección", "Creado"}; // Cabeceras
+        private List<Provider> data = List.of(); // Data inicial vacía
 
-        public void set(List<Provider> rows) {
+        public void set(List<Provider> rows) { // Setear nueva data
             data = rows;
-            fireTableDataChanged();
+            fireTableDataChanged(); // Actualizar tabla
         }
 
-        public Provider getAt(int row) {
-            return data.get(row);
-        }
+        public Provider getAt(int row) { return data.get(row); } // Obtener proveedor fila
 
-        @Override
-        public int getRowCount() {
-            return data.size();
-        }
+        @Override public int getRowCount() { return data.size(); } // Cantidad filas
+        @Override public int getColumnCount() { return cols.length; } // Cantidad columnas
+        @Override public String getColumnName(int c) { return cols[c]; } // Nombre columna
 
         @Override
-        public int getColumnCount() {
-            return cols.length;
-        }
-
-        @Override
-        public String getColumnName(int c) {
-            return cols[c];
-        }
-
-        @Override
-        public Object getValueAt(int r, int c) {
+        public Object getValueAt(int r, int c) { // Valores por columna
             Provider x = data.get(r);
             return switch (c) {
                 case 0 -> x.getId();
