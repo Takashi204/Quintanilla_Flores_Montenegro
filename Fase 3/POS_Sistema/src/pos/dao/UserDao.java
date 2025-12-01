@@ -178,15 +178,31 @@ public class UserDao {
 
     // Convertir una fila SQL → objeto User
     private static User map(ResultSet rs) throws SQLException {
+
+        String id = rs.getString("id");
+        String username = rs.getString("username");
+        String role = rs.getString("role");
+        boolean active = rs.getInt("active") == 1;
+
+        LocalDate createdAt = null;
+        String created = rs.getString("created_at");
+        if (created != null && !created.isBlank()) {
+            createdAt = LocalDate.parse(created);
+        }
+
+        String password = rs.getString("password");
+
+        // campo nuevo en tu clase User
+        String fullName = rs.getString("full_name");
+
         return new User(
-                rs.getString("id"),                                     // ID
-                rs.getString("username"),                               // nombre
-                rs.getString("role"),                                   // rol
-                rs.getInt("active") == 1,                               // activo?
-                rs.getString("created_at") == null                      // fecha creación
-                        ? null
-                        : LocalDate.parse(rs.getString("created_at")),
-                rs.getString("password")                                // contraseña
+                id,
+                username,
+                role,
+                active,
+                createdAt,
+                password,
+                fullName
         );
     }
 }

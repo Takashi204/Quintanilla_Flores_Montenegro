@@ -1,7 +1,8 @@
 package pos.ui.views; // Vista del panel de inventario
 
-import pos.dao.InventoryDao; // DAO para productos
-import pos.dao.MovementDao; // DAO para registrar movimientos de stock
+import pos.services.InventoryService;
+import pos.dao.MovementDao; // si lo tienes
+
 import pos.model.Product; // Modelo del producto
 
 import javax.swing.*; // Componentes UI
@@ -35,11 +36,15 @@ public class InventarioPanel extends JPanel { // Panel de inventario
     private final JTable tabla = new JTable(new ProductosModel()); // Tabla productos
     private final ProductosModel modelo = (ProductosModel) tabla.getModel(); // Modelo casteado
 
-    // DAOs
-    private final InventoryDao dao = new InventoryDao(); // DAO productos
-    private final MovementDao movementDao = new MovementDao(); // DAO movimientos
+ 
 
-    private final String currentUser = "admin"; // Usuario actual (placeholder)
+    // DAO movimientos local
+    private final MovementDao movementDao = new MovementDao();
+
+    // API nueva
+    private final InventoryService inventoryService = new InventoryService();
+
+    private final String currentUser = "admin";
 
     public InventarioPanel() { // Constructor
         setLayout(new BorderLayout(8,8)); // Layout general
@@ -71,19 +76,58 @@ public class InventarioPanel extends JPanel { // Panel de inventario
 
     // ================== Utilidades ==================
 
-    private void recargar() { // Recargar tabla completa
-        modelo.set(dao.listAll());
+    private void recargar() {
+
+        String selectedCode = null;
+
+        int row = tabla.getSelectedRow();
+        if (row >= 0 && row < modelo.data.size()) {
+            selectedCode = modelo.getAt(row).getCode();
+        }
+
+        try {
+            List<Product> productos = InventoryService.getAll();
+            modelo.set(productos);
+
+            // Restaurar selección
+            if (selectedCode != null) {
+                for (int i = 0; i < modelo.data.size(); i++) {
+                    if (modelo.getAt(i).getCode().equalsIgnoreCase(selectedCode)) {
+                        tabla.setRowSelectionInterval(i, i);
+                        break;
+                    }
+                }
+            }
+
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Error cargando inventario: " + ex.getMessage(),
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE
+            );
+        }
     }
 
-    private void filtrar() { // Filtro por texto
-        String q = txtBuscar.getText().trim().toLowerCase(); // Texto query
-        if (q.isEmpty()) { recargar(); return; } // Si vacío → reset
-        List<Product> base = dao.listAll(); // Obtener todos
-        modelo.set(base.stream()
-                .filter(p -> (p.getName() != null && p.getName().toLowerCase().contains(q)) // Coincidencia nombre
-                        || (p.getCode() != null && p.getCode().toLowerCase().contains(q))) // Coincidencia código
-                .collect(Collectors.toList())); // Filtrar
+
+    private void filtrar() {
+        String q = txtBuscar.getText().trim().toLowerCase();
+
+        if (q.isEmpty()) {
+            recargar();
+            return;
+        }
+
+        List<Product> base = modelo.data; // usar datos existentes de la API
+
+        List<Product> filtrado = base.stream()
+                .filter(p -> (p.getName() != null && p.getName().toLowerCase().contains(q))
+                          || (p.getCode() != null && p.getCode().toLowerCase().contains(q)))
+                .collect(Collectors.toList());
+
+        modelo.set(filtrado);
     }
+
 
     private Product getSeleccionado() { // Obtener producto seleccionado
         int row = tabla.getSelectedRow(); // Fila
@@ -91,9 +135,25 @@ public class InventarioPanel extends JPanel { // Panel de inventario
         return modelo.getAt(row); // Obtener producto
     }
 
-    private Product findByCode(String code) { // Buscar por código
-        return dao.findByCode(code);
+    private Product findByCode(String code) {
+
+        if (code == null || code.isBlank()) return null;
+
+        try {
+            // Siempre buscar primero en API
+            Product p = inventoryService.getByCode(code);
+            if (p != null) return p;
+        } catch (Exception ignored) {}
+
+        // Si falla la API, intenta desde la tabla local
+        for (Product p : modelo.data) {
+            if (p.getCode().equalsIgnoreCase(code)) return p;
+        }
+
+        return null;
     }
+
+
 
     private void warn(String msg) { JOptionPane.showMessageDialog(this, msg, "Atención", JOptionPane.WARNING_MESSAGE); } // Alerta
     private void info(String msg) { JOptionPane.showMessageDialog(this, msg, "OK", JOptionPane.INFORMATION_MESSAGE); } // Info
@@ -107,157 +167,210 @@ public class InventarioPanel extends JPanel { // Panel de inventario
 
     // ================== Operaciones ==================
 
-    private void onEntrada() { // Entrada de stock
-        JTextField txtCode  = new JTextField(); // Código
-        JTextField txtName  = new JTextField(); // Nombre
-        JTextField txtCat   = new JTextField("General"); // Categoría
-        JTextField txtPrice = new JTextField("0"); // Precio
-        JTextField txtExp   = new JTextField(""); // Fecha vencimiento
-        JSpinner spQty      = new JSpinner(new SpinnerNumberModel(1, 1, 1000000, 1)); // Cantidad
-        JTextField txtReason= new JTextField("Entrada de stock"); // Motivo
+    private void onEntrada() {
 
-        JPanel wrap = new JPanel(new GridLayout(0,1,4,4)); // Contenedor
-        wrap.add(form2("Código:", txtCode, "Nombre:", txtName)); // Línea
+        JTextField txtCode  = new JTextField();
+        JTextField txtName  = new JTextField();
+        JTextField txtCat   = new JTextField("General");
+        JTextField txtPrice = new JTextField("0");
+        JSpinner spQty      = new JSpinner(new SpinnerNumberModel(1, 1, 1_000_000, 1));
+        JTextField txtReason= new JTextField("Entrada de stock");
+
+        JPanel wrap = new JPanel(new GridLayout(0,1,4,4));
+        wrap.add(form2("Código:", txtCode, "Nombre:", txtName));
         wrap.add(form2("Categoría:", txtCat, "Precio:", txtPrice));
-        wrap.add(form2("Vencimiento (AAAA-MM-DD):", txtExp, "Cantidad (+):", spQty));
-        wrap.add(form2("Motivo:", txtReason, "", new JLabel()));
+        wrap.add(form2("Cantidad (+):", spQty, "Motivo:", txtReason));
 
-        int ok = JOptionPane.showConfirmDialog(this, wrap, "Entrada de producto", JOptionPane.OK_CANCEL_OPTION); // Mostrar modal
-        if (ok != JOptionPane.OK_OPTION) return; // Cancelado
+        int ok = JOptionPane.showConfirmDialog(this, wrap, "Entrada de producto", JOptionPane.OK_CANCEL_OPTION);
+        if (ok != JOptionPane.OK_OPTION) return;
 
         String code = txtCode.getText().trim();
         if (code.isEmpty()) { warn("El código es obligatorio."); return; }
 
-        Product prod = findByCode(code); // Buscar existente
-        int qty = (Integer) spQty.getValue(); // Cantidad
+        Product prod = findByCode(code);
+        int qty = (Integer) spQty.getValue();
 
-        if (prod == null) { // Producto nuevo
+        // ===============================
+        // 🟢 PRODUCTO NUEVO → CREAR
+        // ===============================
+        if (prod == null) {
+
             String name = txtName.getText().trim();
             if (name.isEmpty()) { warn("El nombre es obligatorio."); return; }
-            String cat = txtCat.getText().trim();
+
             int price;
             try { price = Integer.parseInt(txtPrice.getText().trim()); }
             catch (Exception e) { warn("Precio inválido."); return; }
-            LocalDate exp = null;
-            if (!txtExp.getText().trim().isEmpty()) { // Si ingresó vencimiento
-                try { exp = LocalDate.parse(txtExp.getText().trim()); }
-                catch (Exception e) { warn("Fecha inválida."); return; }
+
+            prod = new Product(
+                    0,
+                    code,
+                    name,
+                    txtCat.getText().trim(),
+                    price,
+                    qty,
+                    null
+            );
+            prod.setActive(true);
+
+            try {
+                inventoryService.createProduct(prod);
+
+                // Consultar ID real
+                Product apiProd = inventoryService.getByCode(code);
+                if (apiProd != null) prod.setId(apiProd.getId());
+
+            } catch (Exception ex) {
+                warn("Error API al crear producto: " + ex.getMessage());
+                return;
             }
-            prod = new Product(code, name, cat, price, qty, exp); // Crear producto
-            dao.insert(prod); // Insertar nuevo
-        } else { // Producto existente
-            int prev = prod.getStock(); // Stock previo
-            prod.setStock(prev + qty); // Sumar stock
-            dao.update(prod); // Actualizar BD
-            movementDao.insert(code, "ENTRY", qty, prev, prod.getStock(), // Registrar movimiento
-                    txtReason.getText(), currentUser, LocalDateTime.now());
         }
 
-        info("Entrada aplicada a " + prod.getName() + ". Nuevo stock: " + prod.getStock()); // Mensaje
-        recargar(); // Actualizar tabla
+        // ===============================
+        // 🔵 PRODUCTO EXISTENTE → SUMAR STOCK
+        // ===============================
+        else {
+            prod.setStock(prod.getStock() + qty);
+
+            try {
+                inventoryService.updateProduct(prod);
+            } catch (Exception ex) {
+                warn("Error API al sumar stock: " + ex.getMessage());
+                return;
+            }
+        }
+
+        info("Entrada aplicada correctamente.");
+        recargar();
     }
 
-    private void onSalida() { // Salida de stock
-        Product p = getSeleccionado(); // Seleccionado
+    private void onSalida() {
+
+        Product p = getSeleccionado();
         if (p == null) { warn("Selecciona un producto."); return; }
 
-        JSpinner spQty = new JSpinner(new SpinnerNumberModel(1, 1, 1000000, 1)); // Cantidad
-        JTextField txtReason = new JTextField("Salida manual"); // Motivo
-        JPanel form = form2("Cantidad (−):", spQty, "Motivo:", txtReason); // Formulario
+        JSpinner spQty = new JSpinner(new SpinnerNumberModel(1, 1, 1_000_000, 1));
+        JTextField txtReason = new JTextField("Salida de stock");
+
+        JPanel form = form2("Cantidad (–):", spQty, "Motivo:", txtReason);
 
         int ok = JOptionPane.showConfirmDialog(this, form, "Salida de stock", JOptionPane.OK_CANCEL_OPTION);
         if (ok != JOptionPane.OK_OPTION) return;
 
         int qty = (Integer) spQty.getValue();
-        int prev = p.getStock();
-        int newStock = Math.max(0, prev - qty); // No bajar de 0
-        p.setStock(newStock);
 
-        movementDao.insert(p.getCode(), "EXIT", qty, prev, newStock, // Movimiento
-                txtReason.getText(), currentUser, LocalDateTime.now());
-        dao.update(p); // Guardar cambios
+        if (p.getStock() < qty) {
+            warn("No puedes retirar más del stock disponible.\nStock actual: " + p.getStock());
+            return;
+        }
 
-        info("Salida aplicada. Stock: " + prev + " → " + newStock);
+        p.setStock(p.getStock() - qty);
+
+        try {
+            inventoryService.updateProduct(p);
+        } catch (Exception ex) {
+            warn("Error API al restar stock: " + ex.getMessage());
+            return;
+        }
+
+        info("Salida aplicada correctamente.");
         recargar();
     }
 
-    private void onAjuste() { // Ajuste general
+    private void onAjuste() {
+
         Product p = getSeleccionado();
         if (p == null) { warn("Selecciona un producto."); return; }
 
+        JTextField txtCode = new JTextField(p.getCode());
         JTextField txtName = new JTextField(p.getName());
         JTextField txtCat  = new JTextField(p.getCategory());
         JSpinner spPrice   = new JSpinner(new SpinnerNumberModel(p.getPrice(), 0, 1_000_000_000, 1));
-        JTextField txtExp  = new JTextField(p.getExpiry() == null ? "" : p.getExpiry().toString());
         JSpinner spStock   = new JSpinner(new SpinnerNumberModel(p.getStock(), 0, 1_000_000, 1));
         JTextField txtReason = new JTextField("Ajuste / edición manual");
 
         JPanel form = new JPanel(new GridLayout(0,2,6,6));
-        form.add(new JLabel("Código:")); form.add(new JLabel(p.getCode()));
+        form.add(new JLabel("Código:")); form.add(txtCode);
         form.add(new JLabel("Nombre:")); form.add(txtName);
-        form.add(new JLabel("Categoría:")); form.add(txtCat);
-        form.add(new JLabel("Precio:")); form.add(spPrice);
-        form.add(new JLabel("Vencimiento (AAAA-MM-DD):")); form.add(txtExp);
+        form.add(new JLabel("Categoría/Descripción:")); form.add(txtCat);
+        form.add(new JLabel("Precio venta:")); form.add(spPrice);
         form.add(new JLabel("Nuevo stock:")); form.add(spStock);
         form.add(new JLabel("Motivo:")); form.add(txtReason);
 
         int ok = JOptionPane.showConfirmDialog(this, form, "Ajuste de producto", JOptionPane.OK_CANCEL_OPTION);
         if (ok != JOptionPane.OK_OPTION) return;
 
+        p.setCode(txtCode.getText().trim());
         p.setName(txtName.getText().trim());
         p.setCategory(txtCat.getText().trim());
         p.setPrice((Integer) spPrice.getValue());
-        if (!txtExp.getText().trim().isEmpty()) {
-            try { p.setExpiry(LocalDate.parse(txtExp.getText().trim())); }
-            catch (Exception e) { warn("Fecha inválida."); return; }
+        p.setStock((Integer) spStock.getValue());
+
+        try {
+            inventoryService.updateProduct(p);
+        } catch (Exception ex) {
+            warn("Error API al actualizar producto: " + ex.getMessage());
+            return;
         }
 
-        int prev = p.getStock();
-        int newStock = (Integer) spStock.getValue();
-        p.setStock(newStock);
-
-        if (newStock != prev) {
-            movementDao.insert(p.getCode(), "ADJUST", Math.abs(newStock - prev),
-                    prev, newStock, txtReason.getText(), currentUser, LocalDateTime.now());
-        }
-        dao.update(p);
-
-        info("Ajuste aplicado. Stock: " + prev + " → " + newStock);
+        info("✔ Ajuste aplicado correctamente.");
         recargar();
     }
 
-    private void onDelete() { // Eliminar producto
-        Product p = getSeleccionado();
-        if (p == null) { warn("Selecciona un producto."); return; }
+    private void openHistorial() {
+        JFrame f = new JFrame("Historial de Movimientos");
+        f.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        f.setSize(900, 600);
+        f.setLocationRelativeTo(this);
+        f.setContentPane(new MovementsPanel()); 
+        f.setVisible(true);
+    }
+    private void onDelete() {
 
-        String extra = p.getStock() > 0
-                ? "\n\n⚠️ Se registrará un movimiento DELETE y stock 0."
-                : "";
-        int r = JOptionPane.showConfirmDialog(this,
-                "¿Eliminar el producto \"" + p.getName() + "\" (" + p.getCode() + ")?"
-                        + "\nEsta acción no se puede deshacer." + extra,
-                "Confirmar eliminación", JOptionPane.YES_NO_OPTION);
+        Product p = getSeleccionado();
+        if (p == null) {
+            warn("Selecciona un producto.");
+            return;
+        }
+
+        int r = JOptionPane.showConfirmDialog(
+                this,
+                "¿Eliminar el producto \"" + p.getName() + "\"?\n" +
+                "Código: " + p.getCode() +
+                "\n\n⚠ Esta acción no se puede deshacer.",
+                "Confirmar eliminación",
+                JOptionPane.YES_NO_OPTION
+        );
+
         if (r != JOptionPane.YES_OPTION) return;
 
-        movementDao.insert(p.getCode(), "DELETE", p.getStock(), p.getStock(), 0,
-                "Eliminación de producto", currentUser, LocalDateTime.now());
-        dao.delete(p.getCode());
+        // =====================================
+        // 🔵 1) Llamar API para eliminar
+        // =====================================
+        try {
+            inventoryService.deleteProduct(p.getId());
+        } catch (Exception ex) {
+            warn("❌ Error API al eliminar producto: " + ex.getMessage());
+            ex.printStackTrace();
+            return;
+        }
 
-        info("Producto eliminado correctamente.");
-        recargar();
-    }
+        // =====================================
+        // 📌 2) Registrar movimiento local DELETE
+        // =====================================
+        movementDao.insert(
+                p.getCode(),
+                "DELETE",
+                p.getStock(),
+                p.getStock(),
+                0,
+                "Eliminación de producto",
+                currentUser,
+                LocalDateTime.now()
+        );
 
-    private void openHistorial() { // Abrir ventana historial
-        String preset = "";
-        Product sel = getSeleccionado();
-        if (sel != null) preset = sel.getCode();
-
-        JDialog d = new JDialog(SwingUtilities.getWindowAncestor(this),
-                "Historial de Movimientos", Dialog.ModalityType.MODELESS);
-        d.setContentPane(new MovementsPanel(preset));
-        d.setSize(900, 500);
-        d.setLocationRelativeTo(this);
-        d.setVisible(true);
+        info("✔ Producto eliminado correctamente.");
+        recargar(); // recargar inventario desde API
     }
 
     // ================== Modelo de tabla ==================
@@ -284,9 +397,8 @@ public class InventarioPanel extends JPanel { // Panel de inventario
                 case 4 -> p.getStock(); // Stock
                 case 5 -> p.getStock() > 0 ? "OK" : "SIN STOCK"; // Estado visual
                 case 6 -> (p.getExpiry() == null) ? "-" : DF.format(p.getExpiry()); // Fecha vencimiento
-                default -> "";
+                default -> ""; 
             };
         }
     }
 }
-

@@ -1,84 +1,94 @@
-package pos.model; // el modelo SaleItem vive en este paquete
+package pos.model;
 
-import java.util.Objects; // usado para equals/hashCode
+import java.util.Objects;
 
 public class SaleItem {
 
-    // ================================
-    // Atributos del ítem de venta
-    // ================================
+    // ===== CAMPOS QUE USA LA API =====
+    private Integer product_id;      // ID real del producto (API)
+    private int quantity;            // cantidad
+    private int unit_price;          // precio unitario (API)
 
-    private Product product; // producto involucrado en la venta
-    private int quantity;    // cantidad vendida de este producto
+    // ===== CAMPOS DEL POS =====
+    private String product_code;     // código del producto (POS)
+    private int subtotal;            // subtotal del POS
+    private Product product;         // producto completo del POS
 
-    // ================================
-    // Constructor
-    // ================================
+
+    // ===== CONSTRUCTOR =====
     public SaleItem(Product product, int quantity) {
-        this.product = product;              // asignar producto
-        this.quantity = Math.max(1, quantity); // evita cantidades 0 o negativas
+        this.product = product;
+        this.quantity = Math.max(1, quantity);
+
+        // POS
+        this.product_code = product != null ? product.getCode() : null;
+        this.subtotal = getSubtotal();
+
+        // API
+        this.product_id = product != null ? product.getId() : null;
+        this.unit_price = product != null ? product.getPrice() : 0;
     }
 
-    // ================================
-    // GETTERS
-    // ================================
-    public Product getProduct() { return product; }  // devuelve producto
-    public int getQty() { return quantity; }         // alias de cantidad
-    public int getQuantity() { return quantity; }    // cantidad vendida
 
-    // ================================
-    // SETTERS
-    // ================================
-    public void setProduct(Product product) { 
-        this.product = product; 
-    }
+    // ===== GETTERS API =====
+    public Integer getProduct_id() { return product_id; }
+    public int getQuantity() { return quantity; }
+    public int getUnit_price() { return unit_price; }
 
-    public void setQuantity(int quantity) { 
-        // evita poner cantidad 0 o negativa → siempre al menos 1
-        this.quantity = Math.max(1, quantity); 
-    }
+    // ===== GETTERS POS =====
+    public String getProduct_code() { return product_code; }
+    public Product getProduct() { return product; }
+    public int getQty() { return quantity; }
 
-    // ================================
-    // LÓGICA DE NEGOCIO
-    // ================================
-    /** 
-     * Calcula el subtotal del ítem:
-     * subtotal = precio del producto * cantidad
-     * Maneja caso null por seguridad.
-     */
     public int getSubtotal() {
-        int price = (product == null) ? 0 : Math.max(0, product.getPrice());
-        return price * Math.max(1, quantity);
+        if (product == null) return 0;
+        return product.getPrice() * quantity;
     }
 
-    // Representación en texto útil para depuración o impresión
+
+    // ===== SETTERS =====
+    public void setProduct(Product product) {
+        this.product = product;
+
+        // POS
+        this.product_code = product != null ? product.getCode() : null;
+
+        // API
+        this.product_id = product != null ? product.getId() : null;
+        this.unit_price = product != null ? product.getPrice() : 0;
+
+        this.subtotal = getSubtotal();
+    }
+
+    public void setQuantity(int quantity) {
+        this.quantity = Math.max(1, quantity);
+        this.subtotal = getSubtotal();
+    }
+
+
     @Override
     public String toString() {
         String name = (product == null) ? "(producto)" : product.getName();
         return quantity + " x " + name + " = $" + getSubtotal();
     }
 
-    // ================================
-    // EQUALITY — compara ítems por producto y cantidad
-    // ================================
+
+    // PARA QUE FUNCIONE EN TABLAS
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;              // si es el mismo objeto → true
+        if (this == o) return true;
         if (!(o instanceof SaleItem)) return false;
-
         SaleItem that = (SaleItem) o;
 
-        // Comparación segura del código del producto (product puede ser null)
-        String codeA = (product == null) ? null : product.getCode();
-        String codeB = (that.product == null) ? null : that.product.getCode();
+        String codeA = product != null ? product.getCode() : null;
+        String codeB = that.product != null ? that.product.getCode() : null;
 
-        // Igual si tienen el mismo producto y misma cantidad
-        return quantity == that.quantity && Objects.equals(codeA, codeB);
+        return Objects.equals(codeA, codeB) && quantity == that.quantity;
     }
 
     @Override
     public int hashCode() {
-        String code = (product == null) ? null : product.getCode();
-        return Objects.hash(code, quantity); // usa código + cantidad como identidad
+        String code = product != null ? product.getCode() : null;
+        return Objects.hash(code, quantity);
     }
 }

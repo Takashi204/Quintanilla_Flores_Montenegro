@@ -1,198 +1,269 @@
-package pos.ui.views; // Panel de administración dentro del paquete de vistas
+package pos.ui.views;
 
-import pos.dao.UserDao; // DAO para interactuar con usuarios en la BD
-import pos.model.User; // Modelo de usuario
+import pos.model.User;
 
-import javax.swing.*; // Componentes Swing
-import javax.swing.table.AbstractTableModel; // Modelo de tabla
-import java.awt.*; // Layouts y colores
-import java.time.LocalDate; // Fechas
-import java.time.format.DateTimeFormatter; // Formato fecha
-import java.util.List; // Listas
+import pos.services.UserService;
+
+import javax.swing.*;
+import javax.swing.table.AbstractTableModel;
+import java.awt.*;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 /**
- * Panel de administración de usuarios.
- * Permite CRUD completo y reseteo de contraseñas, conectado a UserDao.
+ * Panel conectado 100% a la API real usando UserService.
  */
-public class UsuariosPanel extends JPanel { // Panel principal de usuarios
+public class UsuariosPanel extends JPanel {
 
-    private static final DateTimeFormatter DF = DateTimeFormatter.ofPattern("dd-MM-yyyy"); // Formato de fecha
+    private static final DateTimeFormatter DF = DateTimeFormatter.ofPattern("dd-MM-yyyy");
 
-    private final JTextField txtBuscar = new JTextField(20); // Caja de texto para buscar usuarios
-    private final JTable tabla = new JTable(new UsersModel()); // Tabla que muestra usuarios
-    private final UsersModel modelo = (UsersModel) tabla.getModel(); // Modelo de la tabla
+    private final JTextField txtBuscar = new JTextField(20);
+    private final JTable tabla = new JTable(new UsersModel());
+    private final UsersModel modelo = (UsersModel) tabla.getModel();
 
-    public UsuariosPanel() { // Constructor
-        setLayout(new BorderLayout(10, 10)); // Margen general entre componentes
-        setBackground(new Color(0xF9FAFB)); // Fondo suave
+    public UsuariosPanel() {
+        setLayout(new BorderLayout(10, 10));
+        setBackground(new Color(0xF9FAFB));
 
-        JLabel title = new JLabel("Usuarios"); // Título grande
-        title.setFont(title.getFont().deriveFont(Font.BOLD, 18f)); // Estilo bold
-        title.setBorder(BorderFactory.createEmptyBorder(12, 12, 0, 12)); // Padding
-        add(title, BorderLayout.NORTH); // Colocado arriba
+        JLabel title = new JLabel("Usuarios");
+        title.setFont(title.getFont().deriveFont(Font.BOLD, 18f));
+        title.setBorder(BorderFactory.createEmptyBorder(12, 12, 0, 12));
+        add(title, BorderLayout.NORTH);
 
-        JPanel barra = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 8)); // Barra de herramientas
-        barra.setOpaque(false); // Sin fondo
+        JPanel barra = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 8));
+        barra.setOpaque(false);
 
-        JButton btnBuscar = new JButton("Buscar"); // Botón buscar
-        JButton btnNuevo = new JButton("Nuevo"); // Crear usuario nuevo
-        JButton btnEditar = new JButton("Editar"); // Editar usuario seleccionado
-        JButton btnEliminar = new JButton("Eliminar"); // Eliminar usuario
-        JButton btnReset = new JButton("Reset Pass"); // Resetear contraseña
+        JButton btnBuscar = new JButton("Buscar");
+        JButton btnNuevo = new JButton("Nuevo");
+        JButton btnEditar = new JButton("Editar");
+        JButton btnEliminar = new JButton("Eliminar");
 
-        barra.add(txtBuscar); // Input buscar
-        barra.add(btnBuscar); // Botón buscar
-        barra.add(btnNuevo); // Botón nuevo
-        barra.add(btnEditar); // Botón editar
-        barra.add(btnEliminar); // Botón eliminar
-        barra.add(btnReset); // Botón reset pass
-        add(barra, BorderLayout.PAGE_START); // Poner la barra arriba
+        barra.add(txtBuscar);
+        barra.add(btnBuscar);
+        barra.add(btnNuevo);
+        barra.add(btnEditar);
+        barra.add(btnEliminar);
 
-        tabla.setRowHeight(22); // Altura de filas
-        add(new JScrollPane(tabla), BorderLayout.CENTER); // Tabla con scroll
+        add(barra, BorderLayout.PAGE_START);
 
-        recargar(); // Cargar usuarios al iniciar
+        tabla.setRowHeight(22);
+        add(new JScrollPane(tabla), BorderLayout.CENTER);
 
-        btnBuscar.addActionListener(e -> buscar()); // Acción buscar
-        btnNuevo.addActionListener(e -> nuevo()); // Acción nuevo
-        btnEditar.addActionListener(e -> editar()); // Acción editar
-        btnEliminar.addActionListener(e -> eliminar()); // Acción eliminar
-        btnReset.addActionListener(e -> reset()); // Acción reset pass
+        recargar();
+
+        btnBuscar.addActionListener(e -> buscar());
+        btnNuevo.addActionListener(e -> nuevo());
+        btnEditar.addActionListener(e -> editar());
+        btnEliminar.addActionListener(e -> eliminar());
     }
 
-    private void recargar() { // Recargar tabla completa
-        modelo.set(UserDao.getAll()); // Obtener todos los usuarios desde BD
+    // =============================
+    //        LISTAR
+    // =============================
+    private void recargar() {
+        new SwingWorker<List<User>, Void>() {
+            @Override
+            protected List<User> doInBackground() throws Exception {
+                return UserService.getAll();
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    modelo.set(get());
+                } catch (Exception e) {
+                    JOptionPane.showMessageDialog(UsuariosPanel.this,
+                            "Error al cargar usuarios:\n" + e.getMessage(),
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        }.execute();
     }
 
-    private void buscar() { // Filtrar por texto
-        String q = txtBuscar.getText().trim().toLowerCase(); // Texto normalizado
-        if (q.isEmpty()) { recargar(); return; } // Si no hay texto, mostrar todo
-        modelo.set(UserDao.search(q)); // Buscar en BD
+    private void buscar() {
+        String q = txtBuscar.getText().trim().toLowerCase();
+        if (q.isEmpty()) {
+            recargar();
+            return;
+        }
+        JOptionPane.showMessageDialog(this, "La API no soporta búsqueda. Uso recargar.");
+        recargar();
     }
 
-    private void nuevo() { // Crear usuario nuevo
-        JTextField user = new JTextField(); // Input usuario
-        JComboBox<String> rol = new JComboBox<>(new String[]{"ADMIN", "CAJERO"}); // Combo roles
-        JTextField pass = new JTextField("123456"); // Contraseña por defecto
-        JCheckBox activo = new JCheckBox("Activo", true); // Checkbox si está activo
+    // =============================
+    //         NUEVO
+    // =============================
+    private void nuevo() {
+        JTextField user = new JTextField();
+        JComboBox<String> rol = new JComboBox<>(new String[]{"ADMIN", "CAJERO"});
+        JTextField pass = new JTextField("123456");
+        JCheckBox activo = new JCheckBox("Activo", true);
 
-        JPanel p = new JPanel(new GridLayout(0, 2, 6, 6)); // Formulario
+        JPanel p = new JPanel(new GridLayout(0, 2, 6, 6));
         p.add(new JLabel("Usuario:")); p.add(user);
         p.add(new JLabel("Rol:")); p.add(rol);
         p.add(new JLabel("Contraseña:")); p.add(pass);
         p.add(new JLabel("Activo:")); p.add(activo);
 
-        int res = JOptionPane.showConfirmDialog(this, p, "Nuevo usuario", JOptionPane.OK_CANCEL_OPTION); // Dialogo
-        if (res == JOptionPane.OK_OPTION) { // Si presiona OK
-            if (user.getText().isBlank()) { // Validación
-                JOptionPane.showMessageDialog(this, "El nombre de usuario no puede estar vacío.");
-                return;
-            }
-            User u = new User( // Crear objeto usuario
-                    String.valueOf(UserDao.nextId()), // ID autoincremental
-                    user.getText().trim(), // Username
-                    rol.getSelectedItem().toString(), // Rol
-                    activo.isSelected(), // Estado activo
-                    LocalDate.now(), // Fecha creación
-                    pass.getText().trim() // Contraseña
-            );
-            UserDao.insert(u); // Insertar en BD
-            recargar(); // Refrescar tabla
-            JOptionPane.showMessageDialog(this, "Usuario creado correctamente.");
+        int res = JOptionPane.showConfirmDialog(this, p, "Nuevo usuario", JOptionPane.OK_CANCEL_OPTION);
+        if (res != JOptionPane.OK_OPTION) return;
+
+        if (user.getText().isBlank()) {
+            JOptionPane.showMessageDialog(this, "El nombre de usuario no puede estar vacío.");
+            return;
         }
+
+        User u = new User(
+        	    null,
+        	    user.getText().trim(),
+        	    rol.getSelectedItem().toString(),
+        	    activo.isSelected(),
+        	    LocalDate.now(),
+        	    pass.getText().trim(),
+        	    user.getText().trim()   // fullName = mismo nombre  
+        	);
+
+        new SwingWorker<Void, Void>() {
+            @Override
+            protected Void doInBackground() throws Exception {
+                UserService.create(u);
+                return null;
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    get();
+                    JOptionPane.showMessageDialog(UsuariosPanel.this, "Usuario creado correctamente.");
+                    recargar();
+                } catch (Exception e) {
+                    JOptionPane.showMessageDialog(UsuariosPanel.this,
+                            "Error al crear usuario:\n" + e.getMessage(),
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        }.execute();
     }
 
-    private void editar() { // Editar usuario
-        int row = tabla.getSelectedRow(); // Selección de tabla
-        if (row < 0) { // Validación
+    // =============================
+    //          EDITAR
+    // =============================
+    private void editar() {
+        int row = tabla.getSelectedRow();
+        if (row < 0) {
             JOptionPane.showMessageDialog(this, "Selecciona un usuario para editar.");
             return;
         }
 
-        User u = modelo.getAt(row); // Usuario seleccionado
-        JTextField user = new JTextField(u.getUsername()); // Input editable
-        JComboBox<String> rol = new JComboBox<>(new String[]{"ADMIN", "CAJERO"}); // Roles
-        rol.setSelectedItem(u.getRole()); // Seleccionar el actual
-        JCheckBox activo = new JCheckBox("Activo", u.isActive()); // Estado
+        User u = modelo.getAt(row);
 
-        JPanel p = new JPanel(new GridLayout(0, 2, 6, 6)); // Formulario
+        JTextField user = new JTextField(u.getUsername());
+        JComboBox<String> rol = new JComboBox<>(new String[]{"ADMIN", "CAJERO"});
+        rol.setSelectedItem(u.getRole());
+        JCheckBox activo = new JCheckBox("Activo", u.isActive());
+
+        JPanel p = new JPanel(new GridLayout(0, 2, 6, 6));
         p.add(new JLabel("Usuario:")); p.add(user);
         p.add(new JLabel("Rol:")); p.add(rol);
         p.add(new JLabel("Activo:")); p.add(activo);
 
-        int res = JOptionPane.showConfirmDialog(this, p, "Editar usuario", JOptionPane.OK_CANCEL_OPTION); // Dialog
-        if (res == JOptionPane.OK_OPTION) { // Si OK
-            if (user.getText().isBlank()) {
-                JOptionPane.showMessageDialog(this, "El nombre de usuario no puede estar vacío.");
-                return;
+        if (JOptionPane.showConfirmDialog(this, p, "Editar usuario", JOptionPane.OK_CANCEL_OPTION)
+                != JOptionPane.OK_OPTION) return;
+
+        // 🔥 ACTUALIZAR MODELO (AQUÍ ESTABA EL ERROR)
+        u.setUsername(user.getText().trim());
+        u.setFullName(user.getText().trim());      // ← ESTA LÍNEA FALTABA
+        u.setRole(rol.getSelectedItem().toString());
+        u.setActive(activo.isSelected());
+
+        new SwingWorker<Void, Void>() {
+            @Override
+            protected Void doInBackground() throws Exception {
+                UserService.update(u);
+                return null;
             }
-            u.setUsername(user.getText().trim()); // Actualiza nombre
-            u.setRole(rol.getSelectedItem().toString()); // Actualiza rol
-            u.setActive(activo.isSelected()); // Actualiza estado
-            UserDao.update(u); // Guardar en BD
-            recargar(); // Refrescar tabla
-            JOptionPane.showMessageDialog(this, "Usuario actualizado correctamente.");
-        }
+
+            @Override
+            protected void done() {
+                try {
+                    get();
+                    JOptionPane.showMessageDialog(UsuariosPanel.this, "Usuario actualizado.");
+                    recargar();
+                } catch (Exception e) {
+                    JOptionPane.showMessageDialog(UsuariosPanel.this,
+                            "Error al actualizar:\n" + e.getMessage(),
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        }.execute();
     }
 
-    private void eliminar() { // Eliminar usuario
-        int row = tabla.getSelectedRow(); // Selección
+    // =============================
+    //         ELIMINAR
+    // =============================
+    private void eliminar() {
+        int row = tabla.getSelectedRow();
         if (row < 0) {
             JOptionPane.showMessageDialog(this, "Selecciona un usuario para eliminar.");
             return;
         }
 
-        User u = modelo.getAt(row); // Usuario seleccionado
-        int ok = JOptionPane.showConfirmDialog(this,
-                "¿Eliminar usuario '" + u.getUsername() + "'?", // Mensaje
-                "Confirmar", JOptionPane.YES_NO_OPTION);
+        User u = modelo.getAt(row);
 
-        if (ok == JOptionPane.YES_OPTION) { // Si confirma
-            UserDao.delete(u.getId()); // Eliminar BD
-            recargar(); // Refrescar
-            JOptionPane.showMessageDialog(this, "Usuario eliminado correctamente.");
-        }
+        if (JOptionPane.showConfirmDialog(this,
+                "¿Eliminar usuario '" + u.getUsername() + "'?",
+                "Confirmar", JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) return;
+
+        new SwingWorker<Void, Void>() {
+            @Override
+            protected Void doInBackground() throws Exception {
+                UserService.delete(u.getId());
+                return null;
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    get();
+                    JOptionPane.showMessageDialog(UsuariosPanel.this, "Usuario eliminado.");
+                    recargar();
+                } catch (Exception e) {
+                    JOptionPane.showMessageDialog(UsuariosPanel.this,
+                            "Error al eliminar:\n" + e.getMessage(),
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        }.execute();
     }
 
-    private void reset() { // Resetear contraseña
-        int row = tabla.getSelectedRow(); // Selección
-        if (row < 0) {
-            JOptionPane.showMessageDialog(this, "Selecciona un usuario para cambiar contraseña.");
-            return;
-        }
+    // =============================
+    //     MODELO TABLA
+    // =============================
+    private static class UsersModel extends AbstractTableModel {
+        private final String[] cols = {"ID", "Usuario", "Rol", "Activo", "Creado"};
+        private List<User> data = List.of();
 
-        User u = modelo.getAt(row); // Usuario seleccionado
-        String nueva = JOptionPane.showInputDialog(this, "Nueva contraseña para " + u.getUsername() + ":"); // Input
-        if (nueva != null && !nueva.isBlank()) { // Validación
-            UserDao.resetPassword(u.getId(), nueva.trim()); // Actualizar BD
-            JOptionPane.showMessageDialog(this, "Contraseña actualizada correctamente.");
-        }
-    }
-
-    private static class UsersModel extends AbstractTableModel { // Modelo de tabla
-        private final String[] cols = {"ID", "Usuario", "Rol", "Activo", "Creado"}; // Encabezados tabla
-        private List<User> data = List.of(); // Datos
-
-        void set(List<User> d) { // Cargar registros
+        void set(List<User> d) {
             data = d;
-            fireTableDataChanged(); // Actualizar tabla
+            fireTableDataChanged();
         }
 
-        User getAt(int r) { return data.get(r); } // Obtener usuario por fila
+        User getAt(int r) { return data.get(r); }
 
-        @Override public int getRowCount() { return data.size(); } // Cant filas
-        @Override public int getColumnCount() { return cols.length; } // Cant columnas
-        @Override public String getColumnName(int c) { return cols[c]; } // Nombre columna
+        @Override public int getRowCount() { return data.size(); }
+        @Override public int getColumnCount() { return cols.length; }
+        @Override public String getColumnName(int c) { return cols[c]; }
 
         @Override
-        public Object getValueAt(int r, int c) { // Datos por celda
+        public Object getValueAt(int r, int c) {
             User u = data.get(r);
             return switch (c) {
-                case 0 -> u.getId(); // ID
-                case 1 -> u.getUsername(); // Usuario
-                case 2 -> u.getRole(); // Rol
-                case 3 -> u.isActive() ? "Sí" : "No"; // Activo
-                case 4 -> u.getCreatedAt() == null ? "-" : DF.format(u.getCreatedAt()); // Fecha creación
+                case 0 -> u.getId();
+                case 1 -> u.getUsername();
+                case 2 -> u.getRole();
+                case 3 -> u.isActive() ? "Sí" : "No";
+                case 4 -> u.getCreatedAt() == null ? "-" : DF.format(u.getCreatedAt());
                 default -> "";
             };
         }

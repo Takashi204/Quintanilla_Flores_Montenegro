@@ -16,19 +16,22 @@ public class MovementDao {
             INSERT INTO inventory_movements
                 (code, type, qty, reason, prev_stock, new_stock, user, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """; // consulta SQL para registrar el movimiento
+        """;
 
         try (Connection cn = Database.get(); PreparedStatement ps = cn.prepareStatement(sql)) {
 
-            ps.setString(1, code);                // código del producto
-            ps.setString(2, type);                // tipo de movimiento (venta, add, etc.)
-            ps.setInt(3, qty);                    // cantidad movida
-            ps.setString(4, reason == null ? "" : reason); // motivo (si es null, deja "")
-            ps.setInt(5, prev);                   // stock antes del cambio
-            ps.setInt(6, now);                    // stock después del cambio
-            ps.setString(7, user);                // usuario que hizo la acción
-            ps.setString(8, ts.toString());       // timestamp
-            ps.executeUpdate();                   // ejecutar insert
+            ps.setString(1, code);
+            ps.setString(2, type);
+            ps.setInt(3, qty);
+            ps.setString(4, reason == null ? "" : reason);
+            ps.setInt(5, prev);
+            ps.setInt(6, now);
+            ps.setString(7, user);
+
+            // Guardamos fecha en formato ISO → orden perfecto
+            ps.setString(8, ts.toString());
+
+            ps.executeUpdate();
 
         } catch (SQLException e) {
             System.err.println("[MovementDao] Error al insertar movimiento: " + e.getMessage());
@@ -39,23 +42,30 @@ public class MovementDao {
     public List<String[]> listRecent(int limit) {
 
         final String sql = """
-            SELECT m.code, i.name AS product_name, m.type, m.qty, m.reason,
-                   m.prev_stock, m.new_stock, m.user, m.created_at
+            SELECT m.code,
+                   COALESCE(i.name, '') AS product_name,
+                   m.type,
+                   m.qty,
+                   m.reason,
+                   m.prev_stock,
+                   m.new_stock,
+                   m.user,
+                   m.created_at
               FROM inventory_movements m
               LEFT JOIN inventory i ON i.code = m.code
              ORDER BY datetime(m.created_at) DESC
              LIMIT ?
-        """; // obtiene los movimientos más recientes
+        """;
 
         List<String[]> out = new ArrayList<>();
 
         try (Connection cn = Database.get(); PreparedStatement ps = cn.prepareStatement(sql)) {
 
-            ps.setInt(1, limit); // límite de filas
+            ps.setInt(1, limit);
 
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    out.add(rowToArray(rs)); // convertir fila → arreglo
+                    out.add(rowToArray(rs));
                 }
             }
 
@@ -70,21 +80,28 @@ public class MovementDao {
     public List<String[]> listByCode(String code, int limit) {
 
         final String sql = """
-            SELECT m.code, i.name AS product_name, m.type, m.qty, m.reason,
-                   m.prev_stock, m.new_stock, m.user, m.created_at
+            SELECT m.code,
+                   COALESCE(i.name, '') AS product_name,
+                   m.type,
+                   m.qty,
+                   m.reason,
+                   m.prev_stock,
+                   m.new_stock,
+                   m.user,
+                   m.created_at
               FROM inventory_movements m
               LEFT JOIN inventory i ON i.code = m.code
              WHERE m.code = ?
              ORDER BY datetime(m.created_at) DESC
              LIMIT ?
-        """; // movimientos filtrados por código
+        """;
 
         List<String[]> out = new ArrayList<>();
 
         try (Connection cn = Database.get(); PreparedStatement ps = cn.prepareStatement(sql)) {
 
-            ps.setString(1, code);  // código del producto
-            ps.setInt(2, limit);    // límite
+            ps.setString(1, code);
+            ps.setInt(2, limit);
 
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
@@ -99,49 +116,57 @@ public class MovementDao {
         return out;
     }
 
-    /** Obtiene solo el último movimiento del producto. */
+    /** Obtiene solo el movimiento más reciente de un producto. */
     public String[] findLatestByCode(String code) {
 
         final String sql = """
-            SELECT m.code, i.name AS product_name, m.type, m.qty, m.reason,
-                   m.prev_stock, m.new_stock, m.user, m.created_at
+            SELECT m.code,
+                   COALESCE(i.name, '') AS product_name,
+                   m.type,
+                   m.qty,
+                   m.reason,
+                   m.prev_stock,
+                   m.new_stock,
+                   m.user,
+                   m.created_at
               FROM inventory_movements m
               LEFT JOIN inventory i ON i.code = m.code
              WHERE m.code = ?
              ORDER BY datetime(m.created_at) DESC
              LIMIT 1
-        """; // busca el movimiento más reciente por código
+        """;
 
         try (Connection cn = Database.get(); PreparedStatement ps = cn.prepareStatement(sql)) {
 
-            ps.setString(1, code); // código
+            ps.setString(1, code);
 
             try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) return rowToArray(rs); // si existe, convertirlo
+                if (rs.next()) return rowToArray(rs);
             }
 
         } catch (SQLException e) {
             System.err.println("[MovementDao] Error al obtener último movimiento: " + e.getMessage());
         }
 
-        return null; // si no hay movimientos
+        return null;
     }
 
-    /** Convierte una fila del ResultSet en un arreglo de Strings. */
+    /** Convierte una fila del ResultSet a arreglo de Strings. */
     private String[] rowToArray(ResultSet rs) throws SQLException {
 
-        return new String[]{
-                rs.getString("code"),                      // código
-                rs.getString("product_name"),              // nombre producto
-                rs.getString("type"),                      // tipo movimiento
-                Integer.toString(rs.getInt("qty")),        // cantidad
-                rs.getString("reason"),                    // motivo
-                Integer.toString(rs.getInt("prev_stock")), // stock antes
-                Integer.toString(rs.getInt("new_stock")),  // stock después
-                rs.getString("user"),                      // usuario
-                rs.getString("created_at")                 // fecha/hora
+        return new String[] {
+                rs.getString("code"),
+                rs.getString("product_name"),
+                rs.getString("type"),
+                Integer.toString(rs.getInt("qty")),
+                rs.getString("reason"),
+                Integer.toString(rs.getInt("prev_stock")),
+                Integer.toString(rs.getInt("new_stock")),
+                rs.getString("user"),
+                rs.getString("created_at")
         };
     }
 }
+
 
 

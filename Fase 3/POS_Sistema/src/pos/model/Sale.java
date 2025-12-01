@@ -1,106 +1,143 @@
-package pos.model; // paquete donde vive el modelo Sale
+package pos.model;
 
-import java.time.LocalDateTime; // para fecha/hora de la venta
-import java.util.List;          // lista de items vendidos
+import java.time.LocalDateTime;
+import java.util.List;
 
 public class Sale {
 
-    // ================================
-    // Atributos principales de la venta
-    // ================================
+    // ===== CAMPOS QUE USA LA API (FastAPI) =====
+    private int session_id;                 // API requiere sesión de caja
+    private String payment_method;          // "cash", "card", "transfer"
+    private String status = "SALE";         // siempre "SALE"
+    public String customer_name = null;     // nombre cliente
+    public String customer_tax_id = null;   // rut cliente
+    private List<SaleItem> items;           // items en formato API
 
-    private final String id;           // ID único de la venta (boleta/factura)
-    private final String docType;      // Tipo de documento (BOLETA, FACTURA, etc.)
-    private final LocalDateTime ts;    // Timestamp exacto de la venta
-    private List<SaleItem> items;      // Lista de productos vendidos
+    // ===== CAMPOS INTERNOS DEL POS =====
+    private final String id;
+    private final String docType;
+    private final LocalDateTime ts;
 
-    private String paymentMethod;      // Método principal de pago (efectivo, tarjeta, etc.)
+    private String paymentMethod;
+    private int payCash;
+    private int payCard;
+    private int payTransfer;
+    private int neto;
+    private int iva;
+    private int total;
+    private String customerId;
+    private final String user;
 
-    // Montos por cada forma de pago (si se paga mixto)
-    private int payCash;               // pago en efectivo
-    private int payCard;               // pago con tarjeta
-    private int payTransfer;           // pago por transferencia
 
-    // Totales calculados
-    private int neto;                  // monto neto
-    private int iva;                   // impuesto
-    private int total;                 // total final
+    // ======================================================
+    // 1) 👉 CONSTRUCTOR PARA API (SE USA AL COBRAR)
+    // ======================================================
+    public Sale(int sessionId, String paymentMethod, List<SaleItem> items) {
+        this.id = null;
+        this.docType = null;
+        this.ts = LocalDateTime.now();
 
-    private String customerId;         // opcional: rut / id cliente
-    private final String user;         // usuario/cajero que realizó la venta
+        // API
+        this.session_id = sessionId;
+        this.payment_method = paymentMethod.toLowerCase();
+        this.items = items;
 
-    // ================================
-    //        CONSTRUCTOR PRINCIPAL
-    // ================================
+        // POS (solo para evitar null)
+        this.paymentMethod = paymentMethod;
+        this.total = 0;
+        this.customerId = null;
+        this.user = null;
+    }
+
+
+    // ======================================================
+    // 2) 👉 CONSTRUCTOR ORIGINAL DEL POS (NO TOCAR)
+    // ======================================================
     public Sale(String id, String docType, LocalDateTime ts, List<SaleItem> items,
                 String paymentMethod, int payCash, int payCard, int payTransfer,
                 int neto, int iva, int total, String customerId, String user) {
 
-        this.id = id;                 // asignar ID
-        this.docType = docType;       // tipo de documento
-        this.ts = ts;                 // timestamp
-        this.items = items;           // lista de items
+        this.id = id;
+        this.docType = docType;
+        this.ts = ts;
 
-        this.paymentMethod = paymentMethod; // método de pago seleccionado
+        this.items = items;
+        this.paymentMethod = paymentMethod;
 
-        this.payCash = payCash;       // pago en efectivo
-        this.payCard = payCard;       // pago con tarjeta
-        this.payTransfer = payTransfer; // transferencia
+        this.payCash = payCash;
+        this.payCard = payCard;
+        this.payTransfer = payTransfer;
 
-        this.neto = neto;             // neto calculado
-        this.iva = iva;               // iva calculado
-        this.total = total;           // total final
+        this.neto = neto;
+        this.iva = iva;
 
-        this.customerId = customerId; // id del cliente (si corresponde)
-        this.user = user;             // usuario que ejecutó la venta
+        this.total = total;
+        this.customerId = customerId;
+        this.user = user;
+
+        this.payment_method = paymentMethod.toLowerCase();
     }
 
-    // ================================
-    //   CONSTRUCTOR COMPATIBLE ANTIGUO
-    // ================================
-    // Para compatibilidad con versiones anteriores donde no se pasaba "user"
-    public Sale(String id, String docType, LocalDateTime ts, List<SaleItem> items,
-                String paymentMethod, int payCash, int payCard, int payTransfer,
-                int neto, int iva, int total, String customerId) {
 
-        // Llama al constructor principal, usando "admin" como usuario por defecto
-        this(id, docType, ts, items, paymentMethod, payCash, payCard, payTransfer,
-                neto, iva, total, customerId, "admin");
+    // ======================================================
+    // 3) 👉 FACTORY METHOD: Construir venta desde POS (API READY)
+    // ======================================================
+    public static Sale fromPOS(List<?> itemsPOS, String docType, String paymentMethod, String customerRut) {
+
+        List<SaleItem> apiItems = new java.util.ArrayList<>();
+
+        for (Object o : itemsPOS) {
+            pos.ui.views.VentasPanel.SaleLine line =
+                    (pos.ui.views.VentasPanel.SaleLine) o;
+
+            SaleItem si = new SaleItem(
+                    line.getProduct(),
+                    line.getQty()
+            );
+
+            apiItems.add(si);
+        }
+
+        // 🚫 NO poner un session_id aquí (se agrega después en VentasPanel)
+        Sale sale = new Sale(
+                0,                // TEMPORAL
+                paymentMethod,
+                apiItems
+        );
+
+        if ("Factura".equalsIgnoreCase(docType)) {
+            sale.customer_name = customerRut;
+            sale.customer_tax_id = customerRut;
+        }
+
+        return sale;
     }
 
-    // ================================
-    //             GETTERS
-    // ================================
 
-    public String getId() { return id; }                 // devuelve ID venta
-    public String getDocType() { return docType; }       // devuelve tipo doc
-    public LocalDateTime getTs() { return ts; }          // devuelve fecha/hora
+    // ===== GETTERS API =====
+    public int getSession_id() { return session_id; }
+    public String getPayment_method() { return payment_method; }
+    public String getStatus() { return status; }
+    public String getCustomer_name() { return customer_name; }
+    public String getCustomer_tax_id() { return customer_tax_id; }
+    public List<SaleItem> getItems() { return items; }
 
-    public String getPaymentMethod() { return paymentMethod; }     // método de pago
-    public int getPayCash() { return payCash; }                     // efectivo
-    public int getPayCard() { return payCard; }                     // tarjeta
-    public int getPayTransfer() { return payTransfer; }             // transferencia
+    // ===== GETTERS POS =====
+    public int getTotal() { return total; }
+    public String getId() { return id; }
+    public String getDocType() { return docType; }
+    public LocalDateTime getTs() { return ts; }
+    public String getPaymentMethod() { return paymentMethod; }
+    public int getPayCash() { return payCash; }
+    public int getPayCard() { return payCard; }
+    public int getPayTransfer() { return payTransfer; }
+    public int getNeto() { return neto; }
+    public int getIva() { return iva; }
+    public String getCustomerId() { return customerId; }
+    public String getUser() { return user; }
 
-    public int getNeto() { return neto; }                 // neto
-    public int getIva() { return iva; }                   // iva
-    public int getTotal() { return total; }               // total final
+    // ===== SETTERS API =====
+    public void setSession_id(int session_id) { this.session_id = session_id; }
+    public void setItems(List<SaleItem> items) { this.items = items; }
 
-    public List<SaleItem> getItems() { return items; }    // items vendidos
-    public String getCustomerId() { return customerId; }  // id cliente
-    public String getUser() { return user; }              // usuario/cajero
-
-    // ================================
-    //             SETTERS
-    // ================================
-
-    public void setPaymentMethod(String paymentMethod) { this.paymentMethod = paymentMethod; } // método pago
-    public void setPayCash(int payCash) { this.payCash = payCash; }                           // efectivo
-    public void setPayCard(int payCard) { this.payCard = payCard; }                           // tarjeta
-    public void setPayTransfer(int payTransfer) { this.payTransfer = payTransfer; }           // transferencia
-
-    public void setItems(List<SaleItem> items) { this.items = items; } // actualizar items
-    public void setTotal(int total) { this.total = total; }             // total
-    public void setNeto(int neto) { this.neto = neto; }                 // neto
-    public void setIva(int iva) { this.iva = iva; }                     // iva
-    public void setCustomerId(String customerId) { this.customerId = customerId; } // id cliente
 }

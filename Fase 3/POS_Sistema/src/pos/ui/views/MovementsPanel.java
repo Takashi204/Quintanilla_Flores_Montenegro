@@ -1,169 +1,179 @@
-package pos.ui.views; // Paquete donde vive este panel
+package pos.ui.views;
 
-import pos.dao.MovementDao; // DAO para consultar movimientos históricos
+import pos.dao.MovementDao;
 
-import javax.swing.*; // Componentes Swing
-import javax.swing.table.DefaultTableModel; // Modelo de tabla editable
-import java.awt.*; // Layouts, colores
-import java.io.FileWriter; // Para guardar CSV
-import java.time.LocalDateTime; // Para nombre del archivo de exportación
-import java.util.List; // Listas
-import java.util.Objects; // Util para manejar nulls
-import java.util.stream.Collectors; // Para filtrar listas
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.io.FileWriter;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
-/**
- * Panel que muestra el historial de movimientos de inventario.
- * Compatible con la versión actualizada de MovementDao.
- */
-public class MovementsPanel extends JPanel { // Panel principal
+public class MovementsPanel extends JPanel {
 
-    private final JTextField txtCode = new JTextField(12); // Input código para filtrar
-    private final JComboBox<String> cboType =              // Combo de tipo de movimiento
+    private final JTextField txtCode = new JTextField(12);
+    private final JComboBox<String> cboType =
             new JComboBox<>(new String[]{"", "ENTRY", "EXIT", "ADJUST", "DELETE"});
-    private final JButton btnFilter  = new JButton("Filtrar"); // Botón aplicar filtros
-    private final JButton btnReset   = new JButton("Limpiar"); // Botón limpiar filtros
-    private final JButton btnRefresh = new JButton("Actualizar"); // Botón recargar tabla
-    private final JButton btnExport  = new JButton("Exportar CSV"); // Botón exportar CSV
 
-    private final JTable table; // Tabla donde se muestran movimientos
-    private final DefaultTableModel model; // Modelo que controla la tabla
+    private final JButton btnFilter  = new JButton("Filtrar");
+    private final JButton btnReset   = new JButton("Limpiar");
+    private final JButton btnRefresh = new JButton("Actualizar");
+    private final JButton btnExport  = new JButton("Exportar CSV");
 
-    private final MovementDao dao = new MovementDao(); // DAO de movimientos
+    private final JTable table;
+    private final DefaultTableModel model;
 
-    public MovementsPanel() { // Constructor sin filtro inicial
+    private final MovementDao dao = new MovementDao();
+
+    public MovementsPanel() {
         this("");
     }
 
-    /** Permite abrir el historial ya filtrado por un código. */
-    public MovementsPanel(String presetCode) { // Constructor con filtro pre-cargado
-        setLayout(new BorderLayout(8, 8)); // Layout principal
-        setBackground(Color.WHITE); // Fondo blanco limpio
+    /** Permite abrir con filtro pre-cargado */
+    public MovementsPanel(String presetCode) {
 
-        // ====== Barra de filtros ======
-        JPanel filters = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8)); // Panel de filtros
-        filters.add(new JLabel("Código:")); // Texto "Código"
-        filters.add(txtCode); // Input código
-        filters.add(new JLabel("Tipo:")); // Texto "Tipo"
-        filters.add(cboType); // Combo tipo
-        filters.add(btnFilter); // Botón filtrar
-        filters.add(btnReset); // Botón limpiar
-        filters.add(btnRefresh); // Botón actualizar
-        filters.add(btnExport); // Botón exportar
-        add(filters, BorderLayout.NORTH); // Lo agrega arriba
+        setLayout(new BorderLayout(8, 8));
 
-        // ====== Tabla ======
+        // ==================== Barra de filtros ====================
+        JPanel filters = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 8));
+        filters.add(new JLabel("Código:"));
+        filters.add(txtCode);
+        filters.add(new JLabel("Tipo:"));
+        filters.add(cboType);
+        filters.add(btnFilter);
+        filters.add(btnReset);
+        filters.add(btnRefresh);
+        filters.add(btnExport);
+
+        add(filters, BorderLayout.NORTH);
+
+        // ==================== Tabla ====================
         model = new DefaultTableModel(new Object[]{
                 "Fecha", "Tipo", "Código", "Producto", "Cantidad",
                 "Stock (antes→después)", "Usuario", "Motivo"
         }, 0) {
-            @Override public boolean isCellEditable(int r, int c) { return false; } // Tabla no editable
+            @Override public boolean isCellEditable(int r, int c) { return false; }
         };
 
-        table = new JTable(model); // Crear tabla con modelo
-        table.setFillsViewportHeight(true); // Que la tabla se expanda
-        table.setRowHeight(22); // Alto filas
-        table.getTableHeader().setReorderingAllowed(false); // Evitar arrastrar columnas
-        add(new JScrollPane(table), BorderLayout.CENTER); // Agregar scroll + tabla
+        table = new JTable(model);
+        table.setRowHeight(22);
+        table.getTableHeader().setReorderingAllowed(false);
 
-        if (presetCode != null && !presetCode.isBlank()) { // Si viene código pre-cargado
-            txtCode.setText(presetCode); // Lo escribe en el input
+        add(new JScrollPane(table), BorderLayout.CENTER);
+
+        if (presetCode != null && !presetCode.isBlank()) {
+            txtCode.setText(presetCode);
         }
 
-        // ====== Listeners ======
-        btnFilter.addActionListener(e -> loadData()); // Aplicar filtros
-        btnReset.addActionListener(e -> { // Limpiar filtros
-            txtCode.setText(""); // Vaciar código
-            cboType.setSelectedIndex(0); // Limpiar tipo
-            loadData(); // Recargar completa
+        // ==================== LISTENERS ====================
+        btnFilter.addActionListener(e -> loadData());
+        btnReset.addActionListener(e -> {
+            txtCode.setText("");
+            cboType.setSelectedIndex(0);
+            loadData();
         });
-        btnRefresh.addActionListener(e -> loadData()); // Forzar actualización
-        btnExport.addActionListener(e -> exportCsv()); // Exportar CSV
+        btnRefresh.addActionListener(e -> loadData());
+        btnExport.addActionListener(e -> exportCsv());
 
-        // Carga inicial
-        loadData(); // Cargar movimientos al abrir panel
+        // ==================== CARGA INICIAL ====================
+        loadData();
     }
 
-    private void loadData() { // Cargar datos en tabla
-        model.setRowCount(0); // Limpiar tabla
+    private void loadData() {
 
-        String code = txtCode.getText().trim(); // Código filtro
-        String type = Objects.toString(cboType.getSelectedItem(), "").trim(); // Tipo filtro
+        model.setRowCount(0);
 
-        // Si hay código → lista movimientos de ese producto
-        // Si no → lista los más recientes
+        String code = txtCode.getText().trim();
+        String type = Objects.toString(cboType.getSelectedItem(), "").trim();
+
         List<String[]> rows = (!code.isEmpty())
-                ? dao.listByCode(code, 300) // Filtrado por código
-                : dao.listRecent(300); // Ultimos 300 movimientos
+                ? dao.listByCode(code, 300)
+                : dao.listRecent(300);
 
-        // Filtro por tipo (ENTRY/EXIT/ADJUST/DELETE)
+        // Filtro por tipo si corresponde
         if (!type.isEmpty()) {
             rows = rows.stream()
                     .filter(r -> {
-                        int idxType = (r.length >= 9) ? 2 : 0; // Columna tipo = 2
-                        return type.equalsIgnoreCase(r[idxType]); // Aplicar filtro
+                        // tipo está en columna 2
+                        if (r.length < 3) return false;
+                        return type.equalsIgnoreCase(r[2]);
                     })
                     .collect(Collectors.toList());
         }
 
-        // Cargar filas según formato de MovementDao actualizado
+        // Cargar en tabla
         for (String[] r : rows) {
             try {
-                // listRecent devuelve 9 columnas:
-                // [code, product_name, type, qty, reason, prev, new, user, created_at]
-                String c = safe(r, 0); // Código
-                String name = safe(r, 1); // Nombre producto
-                String t = safe(r, 2); // Tipo movimiento
-                String qty = safe(r, 3); // Cantidad movida
-                String reason = safe(r, 4); // Motivo
-                String prev = safe(r, 5); // Stock antes
-                String now = safe(r, 6); // Stock después
-                String user = safe(r, 7); // Usuario
-                String when = safe(r, 8); // Fecha creación
+                String c = safe(r, 0);
+                String name = safe(r, 1);
+                String t = safe(r, 2);
+                String qty = safe(r, 3);
+                String reason = safe(r, 4);
+                String prev = safe(r, 5);
+                String now = safe(r, 6);
+                String user = safe(r, 7);
+                String when = safe(r, 8);
 
-                model.addRow(new Object[]{ when, t, c, name, qty, prev + " → " + now, user, reason });
-            } catch (Exception ignore) {} // Ignorar errores en filas corruptas
+                model.addRow(new Object[]{
+                        when,
+                        t,
+                        c,
+                        name,
+                        qty,
+                        prev + " → " + now,
+                        user,
+                        reason
+                });
+
+            } catch (Exception ignored) {}
         }
 
-        if (model.getRowCount() == 0) { // Si no hay datos
-            JOptionPane.showMessageDialog(this, "No se encontraron movimientos con los filtros aplicados.");
+        if (model.getRowCount() == 0) {
+            JOptionPane.showMessageDialog(this, "No se encontraron movimientos.");
         }
     }
 
-    private String safe(String[] arr, int idx) { // Evita ArrayIndexOutOfBounds
+    private String safe(String[] arr, int idx) {
         return (arr != null && idx < arr.length && arr[idx] != null) ? arr[idx] : "";
     }
 
-    private void exportCsv() { // Exportar tabla a CSV
-        JFileChooser fc = new JFileChooser(); // Selector de archivos
+    private void exportCsv() {
+        JFileChooser fc = new JFileChooser();
         fc.setSelectedFile(new java.io.File(
                 "movimientos_" + LocalDateTime.now().toString().replace(":", "-") + ".csv"
-        )); // Nombre auto + timestamp
-        if (fc.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return; // Cancelado
+        ));
 
-        try (FileWriter w = new FileWriter(fc.getSelectedFile(), false)) { // Crear archivo
+        if (fc.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
 
-            // Encabezados
+        try (FileWriter w = new FileWriter(fc.getSelectedFile(), false)) {
+
             for (int c = 0; c < model.getColumnCount(); c++) {
                 if (c > 0) w.write(",");
-                w.write(model.getColumnName(c)); // Escribir nombre columna
+                w.write(model.getColumnName(c));
             }
             w.write("\n");
 
-            // Filas
-            for (int r = 0; r < model.getRowCount(); r++) { // Recorrer filas
-                for (int c = 0; c < model.getColumnCount(); c++) { // Recorrer columnas
+            for (int r = 0; r < model.getRowCount(); r++) {
+                for (int c = 0; c < model.getColumnCount(); c++) {
                     if (c > 0) w.write(",");
-                    Object val = model.getValueAt(r, c); // Valor celda
-                    String s = (val == null) ? "" : val.toString().replace("\"", "\"\""); // Escapar comillas
-                    w.write("\"" + s + "\""); // Escribir en CSV
+                    Object val = model.getValueAt(r, c);
+                    String s = (val == null) ? "" : val.toString().replace("\"", "\"\"");
+                    w.write("\"" + s + "\"\"");
                 }
                 w.write("\n");
             }
-            JOptionPane.showMessageDialog(this, "CSV exportado correctamente."); // OK
+
+            JOptionPane.showMessageDialog(this, "CSV exportado correctamente.");
+
         } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this,
-                    "No se pudo exportar: " + ex.getMessage(),
-                    "Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(
+                    this,
+                    "Error al exportar: " + ex.getMessage(),
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE
+            );
         }
     }
 }

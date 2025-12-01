@@ -1,6 +1,7 @@
 package pos.ui;
 
-import pos.ui.views.*;             // importa los paneles (Dashboard, Cajero, Inventario, etc.)
+import pos.ui.views.*;    
+         // importa los paneles (Dashboard, Cajero, Inventario, etc.)
 import javax.swing.*;
 import java.awt.*;
 
@@ -53,7 +54,7 @@ public class MainFrame extends JFrame {
 
         boolean admin = isAdmin();     // verifica si es admin
 
-        setTitle("POS Pyme — " + (admin ? "ADMINISTRADOR" : "CAJERO")); // título dinámico
+        setTitle("POS Pyme — " + roleGlobal.toUpperCase()); // título dinámico
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setSize(1200, 720);           // tamaño de ventana
         setLocationRelativeTo(null);  // centrar
@@ -95,7 +96,7 @@ public class MainFrame extends JFrame {
             title.setFont(title.getFont().deriveFont(Font.BOLD, 18f));
             top.add(title, BorderLayout.WEST);
 
-            JLabel user = new JLabel("Usuario: " + usernameGlobal + "  |  Rol: CAJERO");
+            JLabel user = new JLabel("Usuario: " + usernameGlobal + "  |  Rol: " + roleGlobal);
             user.setBorder(BorderFactory.createEmptyBorder(8, 12, 8, 12));
 
             JButton btnLogout = new JButton("Cerrar sesión");
@@ -145,7 +146,8 @@ public class MainFrame extends JFrame {
     // 🔍 Detección de rol
     // ================================================
     private boolean isAdmin() {
-        return "ADMIN".equalsIgnoreCase(roleGlobal);
+        return roleGlobal.equalsIgnoreCase("ADMIN")
+            || roleGlobal.equalsIgnoreCase("SYSADMIN");
     }
 }
 
